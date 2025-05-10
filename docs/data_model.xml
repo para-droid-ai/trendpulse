@@ -1,0 +1,23 @@
+<data_model>
+  <user>
+    <id>string</id>
+    <email>string</email>
+    <topic_streams>array of topic_stream</topic_streams>
+  </user>
+  <topic_stream>
+    <id>string</id>
+    <query>string</query>
+    <update_frequency>enum: hourly|daily|weekly</update_frequency>
+    <detail_level>enum: headline|short|detailed</detail_level>
+    <model>enum: sonar|sonar-pro</model>
+    <recency_filter>string</recency_filter>
+    <last_summary>string</last_summary>
+    <last_sources>array of url</last_sources>
+    <history>array of summary objects</history>
+  </topic_stream>
+  <summary>
+    <content>string</content>
+    <sources>array of url</sources>
+    <created_at>datetime</created_at>
+  </summary>
+</data_model>

@@ -1,0 +1,118 @@
+/* Markdown-specific styles */
+
+.markdown-content {
+  @apply text-gray-800 leading-relaxed;
+}
+
+/* Headings */
+.markdown-content h1 {
+  @apply text-3xl font-bold mt-8 mb-4 border-b pb-2 border-gray-200;
+}
+
+.markdown-content h2 {
+  @apply text-2xl font-bold mt-6 mb-4;
+}
+
+.markdown-content h3 {
+  @apply text-xl font-bold mt-5 mb-3;
+}
+
+.markdown-content h4 {
+  @apply text-lg font-bold mt-4 mb-2;
+}
+
+/* Paragraphs and text */
+.markdown-content p {
+  @apply my-3;
+}
+
+.markdown-content strong {
+  @apply font-bold;
+}
+
+.markdown-content em {
+  @apply italic;
+}
+
+/* Links */
+.markdown-content a {
+  @apply text-blue-600 hover:text-blue-800 underline;
+}
+
+/* Lists */
+.markdown-content ul {
+  @apply list-disc pl-6 my-4;
+}
+
+.markdown-content ol {
+  @apply list-decimal pl-6 my-4;
+}
+
+.markdown-content li {
+  @apply my-1;
+}
+
+/* Blockquotes */
+.markdown-content blockquote {
+  @apply border-l-4 border-gray-300 pl-4 py-1 my-4 italic bg-gray-50 rounded-sm;
+}
+
+/* Code blocks */
+.markdown-content pre {
+  @apply bg-gray-100 dark:bg-gray-800 rounded-md p-4 my-4 overflow-x-auto;
+}
+
+.markdown-content code {
+  @apply bg-gray-100 dark:bg-gray-800 rounded px-1 py-0.5 font-mono text-sm;
+}
+
+/* Tables */
+.markdown-content table {
+  @apply min-w-full border-collapse border border-gray-300 my-4;
+}
+
+.markdown-content th {
+  @apply bg-gray-100 dark:bg-gray-700 px-4 py-2 text-left font-medium;
+}
+
+.markdown-content td {
+  @apply border border-gray-300 px-4 py-2;
+}
+
+/* Images */
+.markdown-content img {
+  @apply max-w-full h-auto rounded-md my-4;
+}
+
+/* Horizontal rule */
+.markdown-content hr {
+  @apply my-6 border-t border-gray-300;
+}
+
+/* Source citations */
+.markdown-content .source-citation {
+  @apply text-xs text-gray-600 mt-1 flex items-center;
+}
+
+.markdown-content .source-citation::before {
+  content: '📄';
+  @apply mr-1;
+}
+
+/* Dark mode adjustments */
+.dark .markdown-content {
+  @apply text-gray-200;
+}
+
+.dark .markdown-content blockquote {
+  @apply bg-gray-800 border-gray-600;
+}
+
+.dark .markdown-content a {
+  @apply text-blue-400 hover:text-blue-300;
+}
+
+/* Custom class for citation links */
+.citation-link {
+  @apply inline-flex items-center text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full mr-2 mb-2 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300;
+} 

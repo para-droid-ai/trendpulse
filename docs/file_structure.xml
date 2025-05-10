@@ -1,0 +1,50 @@
+<file_structure>
+  <file>
+    <name>README.md</name>
+    <purpose>Project overview, setup instructions, and high-level documentation.</purpose>
+  </file>
+  <file>
+    <name>src/backend/app.py</name>
+    <purpose>Backend server logic, API endpoints, and Perplexity API integration.</purpose>
+  </file>
+  <file>
+    <name>src/backend/scheduler.py</name>
+    <purpose>Background job logic for scheduled topic stream updates.</purpose>
+  </file>
+  <file>
+    <name>src/backend/models.py</name>
+    <purpose>Data models for users, topic streams, and summaries.</purpose>
+  </file>
+  <file>
+    <name>src/frontend/App.jsx</name>
+    <purpose>Main React app entry point and routing.</purpose>
+  </file>
+  <file>
+    <name>src/frontend/components/TopicStreamWidget.jsx</name>
+    <purpose>UI component for displaying a topic stream summary and sources.</purpose>
+  </file>
+  <file>
+    <name>src/frontend/components/TopicStreamForm.jsx</name>
+    <purpose>UI component for creating/configuring a new topic stream.</purpose>
+  </file>
+  <file>
+    <name>src/frontend/components/DeepDiveChat.jsx</name>
+    <purpose>UI component for follow-up Q&A on a topic stream.</purpose>
+  </file>
+  <file>
+    <name>src/utils/perplexity_api.js</name>
+    <purpose>Helper functions for calling the Perplexity API.</purpose>
+  </file>
+  <file>
+    <name>src/utils/scheduler.js</name>
+    <purpose>Helper functions for scheduling background updates (if handled client-side).</purpose>
+  </file>
+  <file>
+    <name>docs/api_schema.xml</name>
+    <purpose>XML schema describing the Perplexity API integration and request/response structure.</purpose>
+  </file>
+  <file>
+    <name>docs/data_model.xml</name>
+    <purpose>XML schema describing the app’s data models and relationships.</purpose>
+  </file>
+</file_structure>

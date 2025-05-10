@@ -1,0 +1,29 @@
+<api_schema>
+  <endpoint>POST /chat/completions</endpoint>
+  <headers>
+    <Authorization>Bearer &lt;token&gt;</Authorization>
+    <Content-Type>application/json</Content-Type>
+  </headers>
+  <request_body>
+    <model>sonar | sonar-pro</model>
+    <messages>
+      <system>
+        You are a helpful assistant that summarizes recent information about the user's query. Focus on developments and news from the last X time period. Present the key findings clearly and concisely, citing sources.
+      </system>
+      <user>[User's Query]</user>
+    </messages>
+    <search_recency_filter>day | week | hour</search_recency_filter>
+    <web_search_options>
+      <search_context_size>medium | high</search_context_size>
+    </web_search_options>
+    <max_tokens>[Based on detail level]</max_tokens>
+    <temperature>0.1</temperature>
+    <top_p>0.8</top_p>
+    <top_k>0</top_k>
+  </request_body>
+  <response>
+    <summary>string</summary>
+    <citations>array of url</citations>
+    <timestamp>datetime</timestamp>
+  </response>
+</api_schema>

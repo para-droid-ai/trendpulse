@@ -1,0 +1,670 @@
+import { useState } from "react";
+
+export default function TrendPulseDashboard() {
+  // State management
+  const [activeView, setActiveView] = useState("dashboard"); // dashboard, deep-dive, settings
+  const [showAddTopicModal, setShowAddTopicModal] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
+  const [currentStep, setCurrentStep] = useState(1);
+  const [dashboardLayout, setDashboardLayout] = useState("grid"); // grid or list
+  const [topics, setTopics] = useState([
+    {
+      id: 1,
+      title: "Latest AI Breakthroughs",
+      summary: "OpenAI has announced a new model with improved reasoning capabilities. Meanwhile, Google DeepMind published research on AI systems that can generate novel protein structures for drug discovery.",
+      lastUpdated: "10 minutes ago",
+      frequency: "hourly",
+      model: "Sonar",
+      sources: [
+        { title: "OpenAI Blog", url: "#" },
+        { title: "DeepMind Research", url: "#" },
+        { title: "MIT Technology Review", url: "#" }
+      ]
+    },
+    {
+      id: 2,
+      title: "Space Exploration News",
+      summary: "NASA's Artemis program continues to make progress with successful tests of the SLS rocket. SpaceX is preparing for another Starship test launch next month.",
+      lastUpdated: "2 hours ago",
+      frequency: "daily",
+      model: "Sonar-Pro",
+      sources: [
+        { title: "NASA.gov", url: "#" },
+        { title: "SpaceX", url: "#" }
+      ]
+    },
+    {
+      id: 3,
+      title: "Climate Change Research",
+      summary: "New study shows ocean temperatures rising faster than previously predicted. Arctic sea ice reached its lowest April extent on record.",
+      lastUpdated: "1 day ago",
+      frequency: "daily",
+      model: "Sonar",
+      sources: [
+        { title: "Nature Climate Change", url: "#" },
+        { title: "NOAA", url: "#" }
+      ]
+    }
+  ]);
+  
+  // Add a new topic
+  const handleAddTopic = () => {
+    const newTopic = {
+      id: topics.length + 1,
+      title: document.getElementById("topicTitle").value,
+      summary: "New topic created. Updates will appear here soon.",
+      lastUpdated: "Just now",
+      frequency: document.querySelector('input[name="frequency"]:checked').value,
+      model: document.querySelector('input[name="model"]:checked').value,
+      sources: []
+    };
+    
+    setTopics([...topics, newTopic]);
+    setShowAddTopicModal(false);
+    setCurrentStep(1);
+  };
+  
+  // Filter topics based on search
+  const filteredTopics = topics.filter(topic => 
+    topic.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  // Handle deep dive selection
+  const handleDeepDive = (topicId) => {
+    setSelectedTopic(topics.find(t => t.id === topicId));
+    setActiveView("deep-dive");
+  };
+  
+  // Handle sending follow-up question
+  const handleSendFollowUp = () => {
+    if (!followUpQuestion.trim()) return;
+    
+    // In a real app, this would send the question to the Perplexity API
+    // For this prototype, we'll just add it to the UI
+    const followUpElement = document.getElementById("follow-up-responses");
+    const newResponse = document.createElement("div");
+    newResponse.className = "bg-blue-50 rounded-lg p-4 mb-3";
+    newResponse.innerHTML = `
+      <p class="font-medium text-gray-500 mb-1">You asked: ${followUpQuestion}</p>
+      <p class="text-gray-800">This would be the response from the Perplexity API, based on both the initial query about "${selectedTopic.title}" and your specific follow-up question.</p>
+      <div class="mt-2">
+        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Source: Example.com</span>
+        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-1">Source: Research.org</span>
+      </div>
+    `;
+    followUpElement.appendChild(newResponse);
+    
+    setFollowUpQuestion("");
+  };
+  
+  // Modal for adding new topics
+  const AddTopicModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg w-full max-w-md mx-4">
+        <div className="p-5 border-b">
+          <h2 className="text-xl font-semibold">Add New Topic</h2>
+          <div className="flex justify-between items-center">
+            <div className="flex">
+              <span className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                {currentStep}
+              </span>
+              <span className="ml-2 text-gray-500">of 3</span>
+            </div>
+            <button 
+              onClick={() => {setShowAddTopicModal(false); setCurrentStep(1);}}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        
+        <div className="p-5">
+          {currentStep === 1 && (
+            <div>
+              <h3 className="font-medium mb-4">Basic Information</h3>
+              <div className="mb-4">
+                <label htmlFor="topicTitle" className="block text-gray-700 mb-1">Topic Title</label>
+                <input 
+                  type="text" 
+                  id="topicTitle" 
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  placeholder="E.g., Latest AI Research"
+                />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="topicQuery" className="block text-gray-700 mb-1">Query</label>
+                <input 
+                  type="text" 
+                  id="topicQuery" 
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  placeholder="What would you like to track?"
+                />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="topicDescription" className="block text-gray-700 mb-1">Description (Optional)</label>
+                <textarea 
+                  id="topicDescription" 
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  rows="3"
+                  placeholder="Add more details about this topic"
+                ></textarea>
+              </div>
+            </div>
+          )}
+          
+          {currentStep === 2 && (
+            <div>
+              <h3 className="font-medium mb-4">Update Configuration</h3>
+              <div className="mb-4">
+                <p className="block text-gray-700 mb-2">Update Frequency</p>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input type="radio" name="frequency" value="hourly" className="mr-2" defaultChecked />
+                    <span>Hourly</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="radio" name="frequency" value="daily" className="mr-2" />
+                    <span>Daily</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="radio" name="frequency" value="weekly" className="mr-2" />
+                    <span>Weekly</span>
+                  </label>
+                </div>
+              </div>
+              <div className="mb-4">
+                <p className="block text-gray-700 mb-2">Level of Detail</p>
+                <select className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="headline">Headline</option>
+                  <option value="short" selected>Short Summary</option>
+                  <option value="detailed">Detailed Summary</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="flex items-center">
+                  <input type="checkbox" className="mr-2" />
+                  <span>Enable notifications for updates</span>
+                </label>
+              </div>
+            </div>
+          )}
+          
+          {currentStep === 3 && (
+            <div>
+              <h3 className="font-medium mb-4">Advanced Settings</h3>
+              <div className="mb-4">
+                <p className="block text-gray-700 mb-2">Model Selection</p>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input type="radio" name="model" value="Sonar" className="mr-2" defaultChecked />
+                    <span className="font-medium">Sonar</span>
+                    <span className="ml-2 text-sm text-gray-500">Faster, cost-effective updates</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="radio" name="model" value="Sonar-Pro" className="mr-2" />
+                    <span className="font-medium">Sonar-Pro</span>
+                    <span className="ml-2 text-sm text-gray-500">More in-depth, additional citations</span>
+                  </label>
+                </div>
+              </div>
+              <div className="mb-4">
+                <p className="block text-gray-700 mb-2">Search Context Size</p>
+                <select className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="low">Low (Faster, less comprehensive)</option>
+                  <option value="medium" selected>Medium (Balanced)</option>
+                  <option value="high">High (Comprehensive, higher cost)</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <details className="cursor-pointer">
+                  <summary className="font-medium text-blue-600">Advanced Parameters</summary>
+                  <div className="mt-2 pl-4 border-l-2 border-gray-200">
+                    <div className="mb-2">
+                      <label className="block text-gray-700 mb-1 text-sm">Temperature</label>
+                      <input type="range" min="0" max="1" step="0.1" defaultValue="0.1" className="w-full" />
+                    </div>
+                    <div className="mb-2">
+                      <label className="block text-gray-700 mb-1 text-sm">Top-P</label>
+                      <input type="range" min="0" max="1" step="0.1" defaultValue="0.8" className="w-full" />
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className="p-5 border-t flex justify-between">
+          {currentStep > 1 && (
+            <button 
+              onClick={() => setCurrentStep(currentStep - 1)}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+            >
+              Back
+            </button>
+          )}
+          {currentStep < 3 ? (
+            <button 
+              onClick={() => setCurrentStep(currentStep + 1)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 ml-auto"
+            >
+              Next
+            </button>
+          ) : (
+            <button 
+              onClick={handleAddTopic}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 ml-auto"
+            >
+              Create Topic
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+  
+  // Settings Panel
+  const SettingsPanel = () => (
+    <div className="max-w-3xl mx-auto bg-white rounded-lg p-6 shadow-lg">
+      <h2 className="text-2xl font-bold mb-6">Settings</h2>
+      
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold mb-4">User Preferences</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-gray-700 mb-2">Theme</label>
+            <div className="flex space-x-4">
+              <label className="flex items-center">
+                <input type="radio" name="theme" value="light" className="mr-2" defaultChecked />
+                <span>Light</span>
+              </label>
+              <label className="flex items-center">
+                <input type="radio" name="theme" value="dark" className="mr-2" />
+                <span>Dark</span>
+              </label>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-gray-700 mb-2">Default Widget Size</label>
+            <select className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="small">Small</option>
+              <option value="medium" selected>Medium</option>
+              <option value="large">Large</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-gray-700 mb-2">Default Update Frequency</label>
+            <select className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="hourly">Hourly</option>
+              <option value="daily" selected>Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-gray-700 mb-2">Notifications</label>
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input type="checkbox" className="mr-2" defaultChecked />
+                <span>Email notifications</span>
+              </label>
+              <label className="flex items-center">
+                <input type="checkbox" className="mr-2" defaultChecked />
+                <span>Push notifications</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold mb-4">API Configuration</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-gray-700 mb-2">Usage Statistics</label>
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm">API Calls: 152/500</p>
+              <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                <div className="bg-blue-600 h-2.5 rounded-full" style={{width: "30%"}}></div>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-gray-700 mb-2">Default Model</label>
+            <select className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="Sonar" selected>Sonar (Cost-effective)</option>
+              <option value="Sonar-Pro">Sonar-Pro (Comprehensive)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex justify-end">
+        <button 
+          onClick={() => setActiveView("dashboard")}
+          className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 mr-3"
+        >
+          Cancel
+        </button>
+        <button 
+          onClick={() => setActiveView("dashboard")}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+  
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <button onClick={() => setActiveView("dashboard")} className="flex items-center">
+                <div className="flex-shrink-0 text-blue-600">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                  </svg>
+                </div>
+                <h1 className="ml-2 text-xl font-bold text-gray-900">TrendPulse</h1>
+              </button>
+            </div>
+            
+            <div className="w-full max-w-xl mx-6 hidden md:block">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3">
+                  <svg className="h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search your dashboard topics..."
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <button 
+                onClick={() => setActiveView("settings")}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+              </button>
+              <div className="relative">
+                <button className="flex items-center text-gray-600 hover:text-gray-900">
+                  <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium">
+                    JP
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Dashboard View */}
+        {activeView === "dashboard" && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Your Dashboard</h2>
+              <div className="flex items-center space-x-3">
+                <div className="flex border rounded-lg overflow-hidden">
+                  <button 
+                    onClick={() => setDashboardLayout("grid")}
+                    className={`px-3 py-1 ${dashboardLayout === "grid" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="14" width="7" height="7"></rect>
+                      <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                  </button>
+                  <button 
+                    onClick={() => setDashboardLayout("list")}
+                    className={`px-3 py-1 ${dashboardLayout === "list" ? "bg-blue-600 text-white" : "bg-white text-gray-700"}`}
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+                <button 
+                  onClick={() => setShowAddTopicModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+                >
+                  <svg className="h-5 w-5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Add New Topic
+                </button>
+              </div>
+            </div>
+            
+            <div className="w-full md:hidden mb-4">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3">
+                  <svg className="h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search your dashboard topics..."
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            {/* Empty State */}
+            {filteredTopics.length === 0 && (
+              <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+                <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 text-blue-600 mb-4">
+                  <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No topics found</h3>
+                <p className="text-gray-500 mb-4">
+                  {searchQuery ? `No results match "${searchQuery}"` : "Get started by adding your first topic to track"}
+                </p>
+                <button 
+                  onClick={() => {setShowAddTopicModal(true); setSearchQuery("");}}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  {searchQuery ? "Clear Search" : "Add First Topic"}
+                </button>
+              </div>
+            )}
+            
+            {/* Grid Layout */}
+            {filteredTopics.length > 0 && dashboardLayout === "grid" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredTopics.map(topic => (
+                  <div key={topic.id} className="bg-white rounded-lg shadow-sm p-5 hover:shadow-md transition-shadow duration-300">
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="text-lg font-semibold text-gray-900">{topic.title}</h3>
+                      <div className="flex items-center text-xs text-gray-500">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">{topic.frequency}</span>
+                        <span className="ml-2">{topic.lastUpdated}</span>
+                      </div>
+                    </div>
+                    <p className="text-gray-700 mb-4 line-clamp-3">{topic.summary}</p>
+                    <div className="flex flex-wrap mb-4">
+                      {topic.sources.map((source, idx) => (
+                        <a key={idx} href={source.url} className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded mr-1 mb-1 hover:bg-gray-200">
+                          {source.title}
+                        </a>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-xs text-gray-500">Model: {topic.model}</span>
+                      <button 
+                        onClick={() => handleDeepDive(topic.id)}
+                        className="px-3 py-1 bg-blue-50 text-blue-600 text-sm rounded hover:bg-blue-100"
+                      >
+                        Deep Dive
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* List Layout */}
+            {filteredTopics.length > 0 && dashboardLayout === "list" && (
+              <div className="space-y-4">
+                {filteredTopics.map(topic => (
+                  <div key={topic.id} className="bg-white rounded-lg shadow-sm p-5 hover:shadow-md transition-shadow duration-300">
+                    <div className="flex flex-col md:flex-row md:items-center">
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">{topic.title}</h3>
+                          <div className="flex items-center text-xs text-gray-500">
+                            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">{topic.frequency}</span>
+                            <span className="ml-2">{topic.lastUpdated}</span>
+                          </div>
+                        </div>
+                        <p className="text-gray-700 mb-3">{topic.summary}</p>
+                        <div className="flex flex-wrap mb-2">
+                          {topic.sources.map((source, idx) => (
+                            <a key={idx} href={source.url} className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded mr-1 mb-1 hover:bg-gray-200">
+                              {source.title}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-3 md:mt-0 md:ml-4 flex items-center">
+                        <span className="text-xs text-gray-500 mr-3">Model: {topic.model}</span>
+                        <button 
+                          onClick={() => handleDeepDive(topic.id)}
+                          className="px-4 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100"
+                        >
+                          Deep Dive
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Deep Dive View */}
+        {activeView === "deep-dive" && selectedTopic && (
+          <div>
+            <button 
+              onClick={() => setActiveView("dashboard")}
+              className="mb-4 flex items-center text-blue-600 hover:text-blue-800"
+            >
+              <svg className="h-5 w-5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+              Back to Dashboard
+            </button>
+            
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="mb-6">
+                <div className="flex justify-between items-start mb-2">
+                  <h2 className="text-2xl font-bold text-gray-900">{selectedTopic.title}</h2>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full mr-2">{selectedTopic.frequency}</span>
+                    <span>Last updated: {selectedTopic.lastUpdated}</span>
+                  </div>
+                </div>
+                <p className="text-gray-700 mb-4">{selectedTopic.summary}</p>
+                <div className="flex flex-wrap mb-6">
+                  {selectedTopic.sources.map((source, idx) => (
+                    <a key={idx} href={source.url} className="text-sm bg-gray-100 text-gray-800 px-2 py-1 rounded mr-2 mb-2 hover:bg-gray-200">
+                      {source.title}
+                    </a>
+                  ))}
+                </div>
+                <div className="flex items-center text-sm text-gray-500">
+                  <span>Using model: </span>
+                  <span className="font-medium ml-1">{selectedTopic.model}</span>
+                  <button className="ml-2 text-blue-600 hover:text-blue-800 text-sm">
+                    Change
+                  </button>
+                </div>
+              </div>
+              
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4">Follow-up Questions</h3>
+                <div id="follow-up-responses" className="space-y-3 mb-4">
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <p className="text-gray-700">
+                      Ask questions about "{selectedTopic.title}" to explore this topic in more depth. 
+                      The AI will use both the initial search results and your specific questions to provide 
+                      detailed, grounded responses.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex">
+                  <input
+                    type="text"
+                    placeholder="Ask a follow-up question..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={followUpQuestion}
+                    onChange={(e) => setFollowUpQuestion(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendFollowUp()}
+                  />
+                  <button 
+                    onClick={handleSendFollowUp}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700"
+                    disabled={!followUpQuestion.trim()}
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Settings View */}
+        {activeView === "settings" && <SettingsPanel />}
+      </main>
+      
+      {/* Add Topic Modal */}
+      {showAddTopicModal && <AddTopicModal />}
+    </div>
+  );
+}
