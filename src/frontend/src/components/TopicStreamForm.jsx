@@ -48,7 +48,8 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
     { value: 'sonar', label: 'Sonar' },
     { value: 'sonar-pro', label: 'Sonar Pro' },
     { value: 'sonar-reasoning', label: 'Sonar Reasoning' },
-    { value: 'sonar-reasoning-pro', label: 'Sonar Reasoning Pro' }
+    { value: 'sonar-reasoning-pro', label: 'Sonar Reasoning Pro' },
+    { value: 'sonar-deep-research', label: 'Sonar Deep Research' }
   ];
   
   const recencyFilterOptions = [
@@ -77,8 +78,6 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
       newErrors.query = 'Query is required';
     } else if (formData.query.trim().length < 3) {
       newErrors.query = 'Query must be at least 3 characters';
-    } else if (formData.query.trim().length > 100) {
-      newErrors.query = 'Query must be less than 100 characters';
     }
     
     // Validate update frequency

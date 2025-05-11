@@ -100,6 +100,17 @@ class SummaryResponse(BaseModel):
 class SummaryCreate(BaseModel):
     content: str
 
+class DeepDiveRequest(BaseModel):
+    topic_stream_id: int
+    summary_id: int
+    question: str
+    model: Optional[str] = None
+
+class DeepDiveResponse(BaseModel):
+    answer: str
+    sources: List[str]
+    model: str
+
 # Database dependency
 def get_db():
     db = SessionLocal()
@@ -212,6 +223,17 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
         
         logger.debug(f"Sending query to Perplexity API: {full_query}")
         
+        # Determine max_tokens based on detail_level
+        if topic_stream.detail_level == DetailLevel.COMPREHENSIVE or topic_stream.detail_level == DetailLevel.DETAILED:
+            max_tokens_for_api = 8000
+            logger.debug(f"Using max_tokens: {max_tokens_for_api} for DETAILED/COMPREHENSIVE level")
+        elif topic_stream.detail_level == DetailLevel.BRIEF:
+            max_tokens_for_api = 1500 
+            logger.debug(f"Using max_tokens: {max_tokens_for_api} for BRIEF level")
+        else: # Default fallback, though ideally all cases are handled
+            max_tokens_for_api = 1000
+            logger.debug(f"Using default max_tokens: {max_tokens_for_api}")
+
         # API call with detailed error handling
         try:
             result = await perplexity_api.search_perplexity(
@@ -220,7 +242,7 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
                 recency_filter=topic_stream.recency_filter,
                 previous_summary=prev_summary_content,  # Pass the previous summary for context
                 temperature=0.2,
-                max_tokens=1000
+                max_tokens=max_tokens_for_api # Use dynamic max_tokens
             )
             logger.debug(f"API call successful, received response of {len(str(result))} characters")
         except Exception as api_error:
@@ -569,67 +591,55 @@ async def update_topic_stream_now(
             detail=f"Error updating topic stream: {str(e)}"
         )
 
-class DeepDiveRequest(BaseModel):
-    topic_stream_id: int
-    summary_id: int
-    question: str
-
-class DeepDiveResponse(BaseModel):
-    answer: str
-    sources: List[str]
-    model: str  # Add model to the response
-
 @app.post("/deep-dive/", response_model=DeepDiveResponse)
 async def deep_dive(
     request: DeepDiveRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Verify topic stream exists and belongs to current user
     topic_stream = db.query(TopicStream).filter(
         TopicStream.id == request.topic_stream_id,
         TopicStream.user_id == current_user.id
     ).first()
     if not topic_stream:
-        raise HTTPException(status_code=404, detail="Topic stream not found")
-    
-    # Verify summary exists and belongs to the topic stream
+        raise HTTPException(status_code=404, detail="Topic stream not found or not owned by user")
+
     summary = db.query(Summary).filter(
         Summary.id == request.summary_id,
         Summary.topic_stream_id == request.topic_stream_id
     ).first()
     if not summary:
         raise HTTPException(status_code=404, detail="Summary not found")
+
+    perplexity_api = PerplexityAPI()
     
+    contextual_question = (
+        f"Regarding the topic \"{topic_stream.query}\" and the following summary:\n\n"
+        f"Summary: {summary.content}\n\n"
+        f"User question: {request.question}"
+    )
+
+    model_to_use = request.model if request.model else "sonar-reasoning"
+    logger.debug(f"Deep dive for topic '{topic_stream.query}', summary ID: {request.summary_id}. Question: '{request.question}'")
+    logger.info(f"Deep Dive - Using model: {model_to_use}") # Changed to INFO for easier spotting
+
     try:
-        # Initialize the Perplexity API
-        perplexity_api = PerplexityAPI()
-        
-        # Use sonar-reasoning model for follow-up questions as it's best for this task
-        model = "sonar-reasoning"
-        
-        # Get the answer and sources
-        context = f"Based on the following summary about '{topic_stream.query}':\n\n{summary.content}"
-        result = await perplexity_api.ask_follow_up_question(
-            query=request.question,
-            context=context,
-            model=model
+        # *** THIS IS THE CRITICAL PART - Ensure it calls search_perplexity ***
+        result = await perplexity_api.search_perplexity(
+            query=contextual_question, 
+            model=model_to_use, 
+            recency_filter="all_time",
+            temperature=0.2, 
+            max_tokens=1000 # Using 1000 as per previous attempt, can be adjusted
         )
-        
-        # Keep the original answer including <think> tags
-        answer = result.get("answer", "No answer available")
-        
-        return {
-            "answer": answer,
-            "sources": result.get("sources", []),
-            "model": model  # Return the model used
-        }
     except Exception as e:
-        logger.error(f"Error in deep dive: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing deep dive request: {str(e)}"
-        )
+        logger.error(f"Error during Perplexity API call in deep_dive: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error communicating with Perplexity API: {str(e)}")
+
+    answer = result.get("answer", "Could not retrieve an answer.")
+    sources_list = result.get("sources", [])
+    
+    return DeepDiveResponse(answer=answer, sources=sources_list, model=model_to_use)
 
 @app.post("/topic-streams/{topic_stream_id}/summaries/", response_model=SummaryResponse)
 def append_summary(

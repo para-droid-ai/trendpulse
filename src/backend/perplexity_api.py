@@ -127,14 +127,14 @@ class PerplexityAPI:
              raise # Re-raise unexpected errors
     
     # Async version for async functions
-    async def _make_request(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _make_request(self, endpoint: str, payload: Dict[str, Any], timeout_seconds: int = 60) -> Dict[str, Any]:
         url = f"{self.BASE_URL}/{endpoint}"
         try:
-            # Set a longer timeout (60 seconds) for the Perplexity API call
-            timeout = aiohttp.ClientTimeout(total=60)  # 60 seconds timeout
+            # Use dynamic timeout
+            timeout_config = aiohttp.ClientTimeout(total=timeout_seconds)
             
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                logger.debug(f"Making API request to {url} with timeout of 60 seconds")
+            async with aiohttp.ClientSession(timeout=timeout_config) as session:
+                logger.debug(f"Making API request to {url} with timeout of {timeout_seconds} seconds")
                 
                 async with session.post(url, headers=self.headers, json=payload) as response:
                     if response.status >= 400:
@@ -248,68 +248,36 @@ class PerplexityAPI:
             'all_time': None  # No filter for all time
         }
         api_recency_filter = recency_map.get(recency_filter, 'day') # Default to 'day'
-        logger.debug(f"Mapping recency filter: internal='{recency_filter}', api='{api_recency_filter}'") # Log the mapping
+        if api_recency_filter is None and recency_filter == 'all_time':
+             # For "all_time", we might need to omit the parameter or handle it as per API spec
+             # For now, let's assume omitting it is fine or the API handles `None` gracefully.
+             pass 
+
+        # Determine timeout based on model
+        current_timeout_seconds = 120 # Default to 120 seconds
+        if model == "sonar-deep-research":
+            current_timeout_seconds = 2400 # 40 minutes for deep research
+            logger.info(f"Using extended timeout for sonar-deep-research: {current_timeout_seconds}s")
         
-        logger.info(f"Searching Perplexity for: '{query}' using model: {model} with recency: {api_recency_filter}")
-
-        # Validate model name
-        valid_models = ["sonar", "sonar-pro", "sonar-reasoning", "sonar-reasoning-pro", "r1-1776"]
-        if model not in valid_models:
-            logger.warning(f"Model '{model}' may not be valid. Valid models are: {valid_models}")
-
-        # Create base messages with enhanced system instruction
-        messages = [
-            {
-                "role": "system",
-                "content": "You are a precise and factual assistant that summarizes information. Format responses with markdown for better readability. When provided with previous context, ONLY provide NEW information that wasn't covered before. If there is no new information available, clearly state that fact without repeating previous content."
-            }
-        ]
-        
-        # If we have previous summary, add context to the messages with clearer instructions
-        if previous_summary:
-            messages.extend([
-                {
-                    "role": "user",
-                    "content": "Here is my previous summary about this topic:"
-                },
-                {
-                    "role": "assistant",
-                    "content": previous_summary
-                },
-                {
-                    "role": "user",
-                    "content": f"I want ONLY NEW information about: {query} that wasn't in my previous summary. If there is no new information, explicitly tell me that no new information is available. DO NOT repeat any information from the previous summary."
-                }
-            ])
-        else:
-            # Just add the user query if no previous summary
-            messages.append({
-                "role": "user",
-                "content": query
-            })
-
         payload = {
             "model": model,
-            "messages": messages,
+            "messages": self._prepare_messages(query, previous_summary),
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "top_p": 0.9
+            "web_search_options": {
+                "search_context_size": "high" # Use high for better results by default
+            }
         }
-        
-        # Only add recency filter if it's not None (all_time)
+
+        # Only add recency filter if it has a value, to handle "all_time"
         if api_recency_filter:
             payload["search_recency_filter"] = api_recency_filter
-            
-        # Add web search options with high context
-        payload["web_search_options"] = {
-            "search_context_size": "high"
-        }
-        
-        # Log the exact payload being sent
-        logger.debug(f"Sending payload to Perplexity API: {json.dumps(payload)}")
-        
+
+        logger.debug(f"Payload for search_perplexity: {json.dumps(payload, indent=2)}")
+
         try:
-            result = await self._make_request("chat/completions", payload)
+            self._check_rate_limit() # Check rate limit before making the call
+            result = await self._make_request("chat/completions", payload, timeout_seconds=current_timeout_seconds)
             logger.debug(f"Received API response: {json.dumps(result)[:200]}...")
             
             # Extract relevant parts

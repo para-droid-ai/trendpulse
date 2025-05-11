@@ -222,13 +222,14 @@ export const topicStreamAPI = {
 
 // Deep Dive API calls
 export const deepDiveAPI = {
-  askQuestion: async (topicStreamId, summaryId, question) => {
+  askQuestion: async (topicStreamId, summaryId, question, model) => {
     try {
-      console.log(`Sending deep dive question for topic ${topicStreamId}, summary ${summaryId}: "${question}"`);
+      console.log(`Sending deep dive question for topic ${topicStreamId}, summary ${summaryId}: "${question}", Model: ${model}`);
       const response = await api.post('/deep-dive/', {
         topic_stream_id: topicStreamId,
         summary_id: summaryId,
-        question: question
+        question: question,
+        model: model
       });
       console.log('Deep dive response received');
       return {

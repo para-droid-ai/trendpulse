@@ -12,6 +12,7 @@ const Dashboard = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedStream, setSelectedStream] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isGridView, setIsGridView] = useState(false);
 
   const fetchTopicStreams = useCallback(async () => {
     setLoading(true);
@@ -110,16 +111,22 @@ const Dashboard = () => {
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
-            className="text-2xl font-bold text-gray-900 dark:text-blue-300 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" 
+            className="text-4xl font-bold uppercase text-black dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-sans" 
             onClick={() => window.location.href = '/'}
           >
             TrendPulse Dashboard
           </h1>
           <div className="flex items-center space-x-4">
-            <span className="text-gray-600">{user?.email}</span>
+            <button
+              onClick={() => setIsGridView(!isGridView)}
+              className="mr-4 text-sm px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
+            >
+              {isGridView ? 'List View' : 'Grid View'}
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</span>
             <button 
               onClick={logout}
-              className="text-sm text-indigo-600 hover:text-indigo-900"
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
               Sign out
             </button>
@@ -127,90 +134,114 @@ const Dashboard = () => {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {error && (
-          <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded" data-testid="error-message">
-            {error}
-            <button 
-              className="float-right font-bold"
-              onClick={clearError}
-              aria-label="Close error message"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        <div className="grid grid-cols-12 gap-6">
-          {/* Sidebar */}
-          <div className="col-span-12 md:col-span-3 bg-white dark:bg-gray-800 rounded-lg shadow">
-            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-blue-300">Topic Streams</h2>
-              <button
-                onClick={() => setShowForm(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white px-3 py-1 rounded text-sm"
-                data-testid="new-stream-button"
+      {/* Main content wrapper for width control */}
+      <main className="py-6">
+        <div className={`${isGridView ? 'w-[95vw] mx-auto' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8`}>
+          {error && (
+            <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded" data-testid="error-message">
+              {error}
+              <button 
+                className="float-right font-bold"
+                onClick={clearError}
+                aria-label="Close error message"
               >
-                New Stream
+                ×
               </button>
             </div>
-            
-            {loading ? (
-              <div className="p-4 text-center text-gray-500" data-testid="loading-indicator">
-                <p>Loading streams...</p>
-              </div>
-            ) : topicStreams.length === 0 ? (
-              <div className="p-4 text-center text-gray-500" data-testid="empty-streams-message">
-                <p>No topic streams yet. Create your first one!</p>
-              </div>
-            ) : (
-              <ul className="divide-y divide-gray-200 dark:divide-gray-700" data-testid="stream-list">
-                {topicStreams.map(stream => (
-                  <li key={stream.id} data-testid={`stream-item-${stream.id}`}>
-                    <button
-                      className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 ${selectedStream?.id === stream.id ? 'bg-indigo-50 dark:bg-indigo-900 border-l-4 border-indigo-600' : ''}`}
-                      onClick={() => setSelectedStream(stream)}
-                    >
-                      <div className="font-medium truncate">{stream.query}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {stream.update_frequency} • {stream.detail_level}
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          )}
 
-          {/* Main content area */}
-          <div className="col-span-12 md:col-span-9">
-            {showForm ? (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6" data-testid="stream-form-container">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-medium">Create New Topic Stream</h2>
+          <div className="grid grid-cols-12 gap-6">
+            {/* Sidebar: Conditionally render in DOM based on isGridView to simplify layout management */}
+            {!isGridView && (
+              <div className="col-span-12 md:col-span-3 bg-white dark:bg-gray-800 rounded-lg shadow">
+                <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-blue-300">Topic Streams</h2>
                   <button
-                    onClick={() => setShowForm(false)}
-                    className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
+                    onClick={() => setShowForm(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white px-3 py-1 rounded text-sm"
+                    data-testid="new-stream-button"
                   >
-                    Cancel
+                    New Stream
                   </button>
                 </div>
-                <TopicStreamForm onSubmit={handleCreateStream} />
-              </div>
-            ) : selectedStream ? (
-              <TopicStreamWidget 
-                stream={selectedStream} 
-                onDelete={() => handleDeleteStream(selectedStream.id)} 
-                onUpdate={handleUpdateStream}
-              />
-            ) : (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center" data-testid="no-selection-message">
-                <p className="text-gray-500 dark:text-gray-300">
-                  Select a topic stream or create a new one to get started
-                </p>
+                
+                {loading ? (
+                  <div className="p-4 text-center text-gray-500" data-testid="loading-indicator">
+                    <p>Loading streams...</p>
+                  </div>
+                ) : topicStreams.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500" data-testid="empty-streams-message">
+                    <p>No topic streams yet. Create your first one!</p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-gray-200 dark:divide-gray-700" data-testid="stream-list">
+                    {topicStreams.map(stream => (
+                      <li key={stream.id} data-testid={`stream-item-${stream.id}`}>
+                        <button
+                          className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-700 ${selectedStream?.id === stream.id ? 'bg-indigo-50 dark:bg-indigo-900 border-l-4 border-indigo-600' : ''}`}
+                          onClick={() => setSelectedStream(stream)}
+                        >
+                          <div className="font-medium text-gray-700 dark:text-gray-300 h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
+                            {stream.query}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {stream.update_frequency} • {stream.detail_level}
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
+
+            {/* Main content area */}
+            <div className={`col-span-12 ${!isGridView ? 'md:col-span-9' : 'md:col-span-12'}`}>
+              {showForm ? (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6" data-testid="stream-form-container">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-medium text-gray-900 dark:text-white">Create New Topic Stream</h2>
+                    <button
+                      onClick={() => setShowForm(false)}
+                      className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <TopicStreamForm onSubmit={handleCreateStream} />
+                </div>
+              ) : isGridView ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {topicStreams.map(stream => (
+                    <TopicStreamWidget
+                      key={stream.id}
+                      stream={stream}
+                      onDelete={() => handleDeleteStream(stream.id)}
+                      onUpdate={handleUpdateStream}
+                      isGridView={true} 
+                    />
+                  ))}
+                  {topicStreams.length === 0 && !loading && (
+                    <div className="col-span-full bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">
+                      <p className="text-gray-500 dark:text-gray-300">No topic streams available to display in grid view.</p>
+                    </div>
+                  )}
+                </div>
+              ) : selectedStream ? (
+                <TopicStreamWidget 
+                  stream={selectedStream} 
+                  onDelete={() => handleDeleteStream(selectedStream.id)} 
+                  onUpdate={handleUpdateStream}
+                  isGridView={false} 
+                />
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center" data-testid="no-selection-message">
+                  <p className="text-gray-500 dark:text-gray-300">
+                    Select a topic stream or create a new one to get started
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>

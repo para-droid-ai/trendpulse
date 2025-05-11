@@ -144,47 +144,80 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   }
 
   return (
-    <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200`}>
-      <div className="p-4 border-b dark:border-gray-700 flex justify-between items-start">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+    <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col h-full`}>
+      <div className={`p-4 border-b dark:border-gray-700 flex ${isGridView ? 'flex-col items-start' : 'justify-between items-start'}`}>
+        <div className={isGridView ? 'mb-2' : ''}>
+          <h3 
+            className={`${isGridView ? 'text-xl font-bold mb-1 line-clamp-2 h-[3.5rem] flex items-center' : 'text-lg font-semibold line-clamp-2 h-[3.5rem] flex items-center'} text-gray-900 dark:text-white`}
+            title={stream.query}  
+          >
             {stream.query}
           </h3>
-          <div className="flex flex-wrap gap-2 mt-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-              {stream.update_frequency}
-            </span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-              {stream.detail_level}
-            </span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-              {stream.model_type}
-            </span>
-          </div>
+          {!isGridView && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                {stream.update_frequency}
+              </span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                {stream.detail_level}
+              </span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                {stream.model_type}
+              </span>
+            </div>
+          )}
         </div>
         
-        <div className="flex space-x-1 flex-shrink-0">
-          <button
-            onClick={handleEdit}
-            className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-          >
-            Edit
-          </button>
-          <button
-            onClick={handleUpdateNow}
-            disabled={updating}
-            className={`text-xs py-1 px-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${
-              updating ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            {updating ? 'Updating...' : 'Update Now'}
-          </button>
-          <button
-            onClick={handleDeleteStream}
-            className="text-xs py-1 px-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-          >
-            Delete Topic Stream
-          </button>
+        <div className={`flex ${isGridView ? 'space-x-1 mt-auto w-full justify-end' : 'space-x-1 flex-shrink-0'}`}>
+          {isGridView ? (
+            <>
+              <button
+                onClick={handleUpdateNow}
+                disabled={updating}
+                title="Update Now"
+                className={`p-1.5 rounded text-white transition-colors ${
+                  updating ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2a8.001 8.001 0 0015.357 2M15 15h-5.418" />
+                </svg>
+              </button>
+              <button
+                onClick={handleDeleteStream}
+                title="Delete Topic Stream"
+                className="p-1.5 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleEdit}
+                className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+              >
+                Edit
+              </button>
+              <button
+                onClick={handleUpdateNow}
+                disabled={updating}
+                className={`text-xs py-1 px-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${
+                  updating ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {updating ? 'Updating...' : 'Update Now'}
+              </button>
+              <button
+                onClick={handleDeleteStream}
+                className="text-xs py-1 px-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Delete Topic Stream
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -195,7 +228,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
         </div>
       )}
 
-      <div className="divide-y dark:divide-gray-700">
+      <div className="divide-y dark:divide-gray-700 flex-grow overflow-y-auto">
         {loading ? (
           <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading summaries...</div>
         ) : summaries.length === 0 && !error ? (
@@ -206,13 +239,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
           summaries.map((summary) => (
             <div key={summary.id} className="p-4">
               <div className="mb-2 flex justify-between items-center">
-                <div className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="text-sm text-gray-500 dark:text-gray-400 font-sans">
                   {summary.created_at ? format(new Date(summary.created_at), 'MMM d, yyyy h:mm a') : 'Date unavailable'}
                 </div>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleDeepDive(summary)}
-                    className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
+                    className={`text-xs px-2 py-1 rounded-full ${isGridView ? 'bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-700' : 'bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300'}`}
                   >
                     Deep Dive
                   </button>
@@ -221,24 +254,29 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     summaryId={summary.id}
                     onSummaryDeleted={handleSummarySuccessfullyDeleted}
                     onError={handleSummaryDeletionError} 
+                    isIconOnly={isGridView}
                   />
                 </div>
               </div>
               
               <div 
-                className={`prose prose-sm max-w-none dark:prose-invert overflow-hidden ${
-                  expandedSummaryId !== summary.id && 'line-clamp-4'
+                className={`prose prose-sm dark:prose-invert max-w-none overflow-hidden font-sans ${
+                  isGridView
+                    ? 'prose-xs prose-h2:font-bold prose-h2:text-gray-800 dark:prose-h2:text-gray-100 prose-h2:leading-snug prose-h3:font-bold prose-h3:text-gray-800 dark:prose-h3:text-gray-100 prose-h3:leading-snug prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-p:leading-relaxed'
+                    : 'prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-p:leading-relaxed'
+                } ${
+                  expandedSummaryId !== summary.id && (isGridView ? 'line-clamp-10' : 'line-clamp-8')
                 }`}
               >
                 <MarkdownRenderer content={summary.content || ''} />
               </div>
               
-              {summary.content && summary.content.length > 300 && (
+              {summary.content && summary.content.length > (isGridView ? 250 : 300) && (
                 <button
                   onClick={() => toggleExpandSummary(summary.id)}
                   className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
                 >
-                  {expandedSummaryId === summary.id ? 'Show less' : 'Read more'}
+                  {expandedSummaryId === summary.id ? 'Show less' : 'Read more →'}
                 </button>
               )}
               
@@ -252,7 +290,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                         href={source.url || source}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900 px-2 py-1 rounded-full truncate max-w-[200px]"
+                        className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
                         title={source.url || source}>
                         {source.name || source.url || source}
                       </a>
