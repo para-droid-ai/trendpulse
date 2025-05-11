@@ -2,6 +2,12 @@
 
 TrendPulse Dashboard is a real-time, customizable web application that empowers users to track evolving topics of interest. Leveraging the Perplexity Sonar API suite, users can define topic streams, receive recency-filtered updates, view concise AI-generated summaries with citations, and interactively ask follow-up questions—all within a dynamic dashboard interface featuring a modern, Perplexity-inspired UI.
 
+## Demo
+
+![TrendPulse Dashboard Demo](docs/Recording%202025-05-11%20at%2012.14.23.gif)
+
+*Demo showcasing the TrendPulse Dashboard's mobile feed view, with real-time updates and interactive features.*
+
 ## Core Features
 
 ### Topic Stream Management
@@ -152,158 +158,4 @@ Set your Perplexity API key as an environment variable. For example, in Powershe
 ```powershell
 $env:PERPLEXITY_API_KEY="your_api_key_here"
 ```
-Or create a `.env` file in the `src/backend` directory with the line:
-`PERPLEXITY_API_KEY=your_api_key_here`
-
-Run the backend server:
-```bash
-python app.py
-```
-
-### Frontend Setup
-Navigate to the frontend directory:
-```bash
-cd src/frontend
-```
-Install dependencies:
-```bash
-npm install
-```
-Run the frontend development server:
-```bash
-npm start
-```
-
-### Environment Variables (Backend - typically in `.env` file in `src/backend`)
-- `PERPLEXITY_API_KEY`: Your Perplexity API key.
-- `SECRET_KEY`: A strong secret key for JWT token generation (e.g., generate one using `openssl rand -hex 32`).
-- `DATABASE_URL`: SQLite database URL (default: `sqlite:///./trendpulse.db`).
-
-## Project Structure
-(Mermaid diagram follows)
-
-## Usage
-
-1. **Sign up and log in** to your TrendPulse Dashboard account.
-2. Click **"Add New Topic Stream"** to define a subject or query you want to track.
-3. Configure **update frequency** (hourly, daily, weekly), **detail level** (brief, detailed, comprehensive), and **model** (e.g., `sonar`, `sonar-pro`, `sonar-reasoning`, `sonar-reasoning-pro`, `sonar-deep-research`).
-4. View your dashboard: each topic stream appears as a widget with the latest AI-generated summary and source citations.
-5. Click a widget to expand it, view the full summary, and **ask follow-up questions** in a chat interface.
-6. Receive **automated updates** as scheduled, with the dashboard refreshing summaries and sources.
-7. Optionally, **enable notifications** for new updates on high-priority topics.
-
-## Perplexity API Usage
-
-- **Endpoint:** `POST /chat/completions`
-- **Parameters (example for topic stream summary generation):**
-  - `model`: (user-selected per stream, e.g., `sonar`, `sonar-pro`, `sonar-deep-research`)
-  - `messages`:
-    - System: Summarizes recent developments for the user's query, focusing on new information within the recency filter, and cites sources.
-    - User: The user's topic or follow-up question.
-  - `search_recency_filter`: Set based on update frequency (e.g., 'day', 'week')
-  - `web_search_options.search_context_size`: `medium` or `high` (based on detail level)
-  - `max_tokens`: Based on detail level (dynamically set by backend)
-  - `temperature`: 0.1 (example value)
-  - `top_p`: 0.8 (example value)
-  - `top_k`: 0 (example value)
-- **Response:**
-  - `summary`: AI-generated summary of recent developments
-  - `citations`: List of source URLs
-  - `timestamp`: Time of update
-
-## Contributing
-
-- Follow the file structure and keep backend/frontend code modular.
-- Document new components and API endpoints clearly.
-- Update `docs/api_schema.xml` and `docs/data_model.xml` with any changes to API usage or data models.
-- Write clear commit messages and open pull requests for review.
-
----
-
-```mermaid
-flowchart TB
-  subgraph Root
-    A[Live_To_do.md]
-    B[README.md]
-    C[.cursor/]
-    D[.venv/]
-    E[docs/]
-    F[src/]
-  end
-
-  subgraph docs
-    G[context.md]
-    H[sonar_API.md]
-    I[sonar_models.md]
-    J[data_model.xml]
-    K[file_structure.xml]
-    L[api_schema.xml]
-    M[testing/]
-  end
-
-  subgraph src
-    N[__init__.py]
-    O[backend/]
-    P[frontend/]
-  end
-
-  subgraph backend
-    O1[app.py]
-    O2[models.py]
-    O3[database.py]
-    O4[perplexity_api.py]
-    O5[scheduler.py]
-    O6[run_server.py]
-    O7[requirements.txt]
-    O8[create_test_user.py]
-    O9[reset_db.py]
-    O10[test_*.py…]
-    O11[utils/]
-  end
-
-  subgraph utils
-    U1[perplexity_api.py]
-    U2[scheduler.js]
-  end
-
-  subgraph frontend
-    P1[package.json]
-    P2[package-lock.json]
-    P3[tailwind.config.js]
-    P4[App.jsx]
-    P5[pages/]
-    P6[src/]
-    P7[components/]
-    P8[services/]
-    P9[context/]
-    P10[public/]
-    P11[build/]
-  end
-
-  subgraph pages
-    L1[Dashboard.jsx]
-    L2[Register.jsx]
-    L3[Login.jsx]
-  end
-
-  subgraph src_front
-    S1[index.js]
-    S2[index.css]
-    S3[markdown.css]
-    S4[pages/]
-    S5[components/]
-    S6[services/]
-    S7[context/]
-  end
-
-  Root --> docs
-  Root --> src
-  src --> backend
-  src --> frontend
-  frontend --> pages
-  frontend --> src_front
-  backend --> utils
-
-```
-
-</rewritten_file>
+Or create a `.env` file in the `src/backend`
