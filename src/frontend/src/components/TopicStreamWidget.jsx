@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { topicStreamAPI } from '../services/api';
 import { format } from 'date-fns';
 import DeepDiveChat from './DeepDiveChat';
@@ -6,7 +6,7 @@ import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
 import TopicStreamForm from './TopicStreamForm';
 
-const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
+const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView, onSwipeLeft, onSwipeRight }) => {
   const [summaries, setSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,6 +16,38 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
+  
+  // Touch handling for swipe gestures
+  const touchStartX = useRef(null);
+  const touchEndX = useRef(null);
+  const MIN_SWIPE_DISTANCE = 50;
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    
+    const distance = touchStartX.current - touchEndX.current;
+    
+    if (Math.abs(distance) > MIN_SWIPE_DISTANCE) {
+      // Negative distance means swipe right, positive means swipe left
+      if (distance > 0 && onSwipeLeft) {
+        onSwipeLeft();
+      } else if (distance < 0 && onSwipeRight) {
+        onSwipeRight();
+      }
+    }
+    
+    // Reset values
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
 
   const fetchSummaries = useCallback(async () => {
     if (!stream || typeof stream.id === 'undefined') {
@@ -96,6 +128,14 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
   const toggleExpandSummary = (id) => {
     setExpandedSummaryId(prevId => (prevId === id ? null : id));
+    if (expandedSummaryId !== id) {
+      setTimeout(() => {
+        const element = document.getElementById(`summary-${id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+    }
   };
 
   const handleEdit = () => {
@@ -144,7 +184,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   }
 
   return (
-    <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-[#2a2a2e] border border-slate-200 dark:border-slate-700 shadow-sm rounded-lg overflow-hidden hover:shadow-md transition-shadow duration-200 flex flex-col h-full`}>
+    <div 
+      className={`${isGridView ? 'flex flex-col h-full min-h-[400px]' : 'w-full'} bg-white dark:bg-[#2a2a2e] border border-slate-200 dark:border-slate-700 shadow-sm rounded-lg overflow-hidden hover:shadow-md transition-shadow duration-200 flex flex-col`}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <div className={`p-4 border-b border-slate-200 dark:border-slate-700 flex ${isGridView ? 'flex-col items-start' : 'justify-between items-start'}`}>
         <div className={isGridView ? 'mb-2' : ''}>
           <h3 
@@ -226,7 +271,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
         </div>
       )}
 
-      <div className="divide-y divide-slate-200 dark:divide-slate-700 flex-grow overflow-y-auto">
+      <div className="divide-y divide-slate-200 dark:divide-slate-700 flex-grow overflow-y-auto max-h-full">
         {loading ? (
           <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading summaries...</div>
         ) : summaries.length === 0 && !error ? (
@@ -235,26 +280,49 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
           </div>
         ) : (
           summaries.map((summary) => (
-            <div key={summary.id} className="p-4">
+            <div key={summary.id} className="p-4 group relative" id={`summary-${summary.id}`}>
               <div className="mb-2 flex justify-between items-center">
-                <div className="text-sm text-gray-500 dark:text-gray-400 font-sans">
+                <div className="text-sm text-slate-500 dark:text-slate-400 font-sans">
                   {summary.created_at ? format(new Date(summary.created_at), 'MMM d, yyyy h:mm a') : 'Date unavailable'}
                 </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleDeepDive(summary)}
-                    className={`text-xs px-2 py-1 rounded-full ${isGridView ? 'bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-700' : 'bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300'}`}
-                  >
-                    Deep Dive
-                  </button>
-                  <SummaryDeleteButton 
-                    streamId={stream.id} 
-                    summaryId={summary.id}
-                    onSummaryDeleted={handleSummarySuccessfullyDeleted}
-                    onError={handleSummaryDeletionError} 
-                    isIconOnly={isGridView}
-                  />
-                </div>
+                {isGridView && (
+                  <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button
+                      onClick={() => handleDeepDive(summary)}
+                      title="Deep Dive"
+                      className="p-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v11.494m0 0A23.056 23.056 0 013.75 12C3.75 9.204 5.284 6.703 7.5 5.253m4.5 12.494A23.055 23.055 0 0020.25 12c0-2.796-1.534-5.297-3.75-6.747M12 17.747A6.726 6.726 0 0016.5 12a6.726 6.726 0 00-4.5-5.747M12 17.747A6.726 6.726 0 017.5 12a6.726 6.726 0 014.5-5.747" />
+                      </svg>
+                    </button>
+                    <SummaryDeleteButton 
+                      streamId={stream.id} 
+                      summaryId={summary.id}
+                      onSummaryDeleted={handleSummarySuccessfullyDeleted}
+                      onError={handleSummaryDeletionError} 
+                      isIconOnly={true}
+                      buttonClassName="p-1 rounded bg-red-500 hover:bg-red-600 text-white"
+                    />
+                  </div>
+                )}
+                {!isGridView && (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleDeepDive(summary)}
+                      className="text-xs px-2 py-1 rounded-full bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-slate-200 hover:bg-indigo-100 dark:hover:bg-slate-600"
+                    >
+                      Deep Dive
+                    </button>
+                    <SummaryDeleteButton 
+                      streamId={stream.id} 
+                      summaryId={summary.id}
+                      onSummaryDeleted={handleSummarySuccessfullyDeleted}
+                      onError={handleSummaryDeletionError} 
+                      isIconOnly={false}
+                    />
+                  </div>
+                )}
               </div>
               
               <div 
@@ -263,18 +331,22 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     ? 'prose-xs prose-h2:font-bold prose-h2:text-gray-800 dark:prose-h2:text-gray-100 prose-h2:leading-snug prose-h3:font-bold prose-h3:text-gray-800 dark:prose-h3:text-gray-100 prose-h3:leading-snug prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-p:leading-relaxed'
                     : 'prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-p:leading-relaxed'
                 } ${
-                  expandedSummaryId !== summary.id && (isGridView ? 'line-clamp-10' : 'line-clamp-8')
+                  expandedSummaryId !== summary.id ? (isGridView ? 'max-h-[800px]' : 'max-h-[600px] overflow-y-auto') : ''
                 }`}
+                style={{
+                  transition: 'max-height 0.5s ease-in-out',
+                  maxHeight: expandedSummaryId === summary.id ? '10000px' : undefined,
+                }}
               >
                 <MarkdownRenderer content={summary.content || ''} />
               </div>
               
-              {summary.content && summary.content.length > (isGridView ? 250 : 300) && (
+              {summary.content && summary.content.length > (isGridView ? 400 : 600) && (
                 <button
                   onClick={() => toggleExpandSummary(summary.id)}
-                  className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
                 >
-                  {expandedSummaryId === summary.id ? 'Show less' : 'Read more →'}
+                  {expandedSummaryId === summary.id ? 'Show less ↑' : 'Show full text ↓'}
                 </button>
               )}
               

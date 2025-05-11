@@ -4,6 +4,8 @@ import { useTheme } from '../context/ThemeContext';
 import { topicStreamAPI } from '../services/api';
 import TopicStreamForm from '../components/TopicStreamForm';
 import TopicStreamWidget from '../components/TopicStreamWidget';
+import { format } from 'date-fns';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -14,7 +16,107 @@ const Dashboard = () => {
   const [showForm, setShowForm] = useState(false);
   const [selectedStream, setSelectedStream] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isGridView, setIsGridView] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list', 'grid', or 'mobile'
+  const [draggedStreamId, setDraggedStreamId] = useState(null);
+  const [dragOverStreamId, setDragOverStreamId] = useState(null);
+  const [currentMobileIndex, setCurrentMobileIndex] = useState(0);
+  const [allSummaries, setAllSummaries] = useState([]);
+  const [loadingSummaries, setLoadingSummaries] = useState(false);
+  
+  // Function to toggle between view modes
+  const toggleViewMode = () => {
+    const newMode = viewMode === 'list' ? 'grid' : 
+                   viewMode === 'grid' ? 'mobile' : 'list';
+    
+    setViewMode(newMode);
+    
+    // If switching to mobile view, fetch all summaries
+    if (newMode === 'mobile' && allSummaries.length === 0) {
+      fetchAllSummaries();
+    }
+  };
+
+  // Get the view mode icon and text based on current mode
+  const getViewModeUI = () => {
+    switch(viewMode) {
+      case 'list':
+        return { icon: '📋', text: 'List View' };
+      case 'grid':
+        return { icon: '📊', text: 'Grid View' };
+      case 'mobile':
+        return { icon: '📱', text: 'Feed' };
+      default:
+        return { icon: '📋', text: 'List View' };
+    }
+  };
+
+  // Fetch summaries from all streams and combine them
+  const fetchAllSummaries = useCallback(async () => {
+    if (topicStreams.length === 0) return;
+    
+    setLoadingSummaries(true);
+    
+    try {
+      // Fetch summaries for each stream
+      const summariesPromises = topicStreams.map(stream => 
+        topicStreamAPI.getSummaries(stream.id)
+          .then(summaries => summaries.map(summary => ({
+            ...summary,
+            streamQuery: stream.query,
+            streamId: stream.id,
+            // Ensure we have a valid date for sorting
+            created_at: summary.created_at || new Date().toISOString()
+          })))
+      );
+      
+      const results = await Promise.all(summariesPromises);
+      
+      // Flatten the array of arrays and sort by created_at (newest first)
+      const combinedSummaries = results
+        .flat()
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      
+      setAllSummaries(combinedSummaries);
+    } catch (err) {
+      console.error('Failed to fetch all summaries:', err);
+      setError('Failed to load feed. Please try again.');
+    } finally {
+      setLoadingSummaries(false);
+    }
+  }, [topicStreams]);
+
+  // Save the stream order to localStorage
+  const saveStreamOrder = (streams) => {
+    try {
+      const orderMap = streams.reduce((acc, stream, index) => {
+        acc[stream.id] = index;
+        return acc;
+      }, {});
+      localStorage.setItem('streamOrder', JSON.stringify(orderMap));
+    } catch (err) {
+      console.error('Failed to save stream order:', err);
+    }
+  };
+
+  // Load ordered streams based on saved order
+  const getOrderedStreams = (streams) => {
+    try {
+      const savedOrder = localStorage.getItem('streamOrder');
+      if (!savedOrder) return streams;
+      
+      const orderMap = JSON.parse(savedOrder);
+      // Create a copy of streams to sort
+      return [...streams].sort((a, b) => {
+        // Use the saved order if available, otherwise keep original order
+        const orderA = orderMap[a.id] !== undefined ? orderMap[a.id] : Infinity;
+        const orderB = orderMap[b.id] !== undefined ? orderMap[b.id] : Infinity;
+        return orderA - orderB;
+      });
+    } catch (err) {
+      console.error('Failed to load stream order:', err);
+      return streams;
+    }
+  };
 
   const fetchTopicStreams = useCallback(async () => {
     setLoading(true);
@@ -28,10 +130,12 @@ const Dashboard = () => {
           throw new Error("Invalid data format received from API.");
       }
       console.log(`Setting ${data.length} topic streams.`);
-      setTopicStreams(data);
-      if (data.length > 0 && !selectedStream) {
-        console.log("Attempting to select first stream:", data[0]);
-        setSelectedStream(data[0]);
+      // Apply saved order to the streams
+      const orderedStreams = getOrderedStreams(data);
+      setTopicStreams(orderedStreams);
+      if (orderedStreams.length > 0 && !selectedStream) {
+        console.log("Attempting to select first stream:", orderedStreams[0]);
+        setSelectedStream(orderedStreams[0]);
         console.log("First stream selected.");
       } else {
           console.log("No streams to select or stream already selected.");
@@ -46,9 +150,28 @@ const Dashboard = () => {
     }
   }, [selectedStream]);
 
+  // Refresh summaries when a new stream is created, updated, or deleted
+  const refreshSummaries = () => {
+    if (viewMode === 'mobile') {
+      fetchAllSummaries();
+    }
+  };
+
   useEffect(() => {
     fetchTopicStreams();
   }, [fetchTopicStreams]);
+
+  // Ensure currentMobileIndex is valid when topicStreams changes
+  useEffect(() => {
+    if (topicStreams.length > 0 && currentMobileIndex >= topicStreams.length) {
+      setCurrentMobileIndex(0);
+    }
+    
+    // If switching to mobile view and we have streams, fetch summaries
+    if (viewMode === 'mobile' && topicStreams.length > 0 && allSummaries.length === 0) {
+      fetchAllSummaries();
+    }
+  }, [topicStreams, currentMobileIndex, viewMode, allSummaries.length, fetchAllSummaries]);
 
   const handleCreateStream = async (newStream) => {
     try {
@@ -56,6 +179,7 @@ const Dashboard = () => {
       setTopicStreams([...topicStreams, createdStream]);
       setSelectedStream(createdStream);
       setShowForm(false);
+      refreshSummaries();
     } catch (err) {
       setError('Failed to create topic stream. Please try again.');
       console.error(err);
@@ -75,6 +199,9 @@ const Dashboard = () => {
       if (selectedStream?.id === id) {
         setSelectedStream(updatedStreams.length > 0 ? updatedStreams[0] : null);
       }
+      
+      // Update summaries by removing ones from the deleted stream
+      setAllSummaries(prev => prev.filter(summary => summary.streamId !== id));
     } catch (err) {
       setError(`Failed to delete topic stream: ${err.response?.data?.detail || 'Unknown error'}`);
       console.error(err);
@@ -94,6 +221,7 @@ const Dashboard = () => {
       if (selectedStream?.id === id) {
         setSelectedStream(updatedApiStream);
       }
+      refreshSummaries();
       return updatedApiStream; 
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to update topic stream.';
@@ -103,27 +231,170 @@ const Dashboard = () => {
     }
   };
 
+  const handleUpdateNow = async (streamId) => {
+    try {
+      setError('');
+      const newSummary = await topicStreamAPI.updateNow(streamId);
+      
+      // Find the stream to get its query
+      const stream = topicStreams.find(s => s.id === streamId);
+      
+      if (newSummary.content && newSummary.content.includes("No new information is available")) {
+        setError('No new information is available since the last update.');
+      } else {
+        // Add the new summary to the combined list
+        setAllSummaries(prev => [
+          {
+            ...newSummary,
+            streamQuery: stream?.query || '',
+            streamId: streamId,
+          },
+          ...prev
+        ]);
+      }
+      
+      return newSummary;
+    } catch (err) {
+      console.error('Failed to update stream:', err);
+      setError(err.message || 'Failed to update stream. Please try again.');
+      throw err;
+    }
+  };
+
+  const handleDragStart = (e, streamId) => {
+    setDraggedStreamId(streamId);
+    e.dataTransfer.effectAllowed = 'move';
+    // Add a visual helper - opacity
+    e.target.style.opacity = '0.5';
+  };
+
+  const handleDragEnd = (e) => {
+    setDraggedStreamId(null);
+    setDragOverStreamId(null);
+    // Reset opacity
+    e.target.style.opacity = '1';
+  };
+
+  const handleDragOver = (e, streamId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (streamId !== draggedStreamId) {
+      setDragOverStreamId(streamId);
+    }
+  };
+
+  const handleDrop = (e, targetStreamId) => {
+    e.preventDefault();
+    if (draggedStreamId !== targetStreamId) {
+      // Reorder the streams
+      const newTopicStreams = [...topicStreams];
+      const draggedStreamIndex = newTopicStreams.findIndex(stream => stream.id === draggedStreamId);
+      const targetStreamIndex = newTopicStreams.findIndex(stream => stream.id === targetStreamId);
+      
+      const [draggedStream] = newTopicStreams.splice(draggedStreamIndex, 1);
+      newTopicStreams.splice(targetStreamIndex, 0, draggedStream);
+      
+      setTopicStreams(newTopicStreams);
+      // Save the new order to localStorage
+      saveStreamOrder(newTopicStreams);
+    }
+    setDraggedStreamId(null);
+    setDragOverStreamId(null);
+  };
+
   const clearError = () => {
     setError('');
   };
 
+  const viewModeUI = getViewModeUI();
+
+  // Render a single summary item for the mobile feed
+  const renderSummaryItem = (summary) => (
+    <div key={summary.id} className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 mb-4">
+      {/* Summary Header */}
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 line-clamp-1 max-w-[75%]" title={summary.streamQuery}>{summary.streamQuery}</h3>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            {summary.created_at ? format(new Date(summary.created_at), 'MMM d, yyyy h:mm a') : ''}
+          </span>
+        </div>
+        
+        {/* Stream Actions */}
+        <div className="flex space-x-2">
+          <button 
+            onClick={() => {
+              const stream = topicStreams.find(s => s.id === summary.streamId);
+              if (stream) handleUpdateNow(stream.id);
+            }}
+            className="text-xs py-1 px-2 bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-200 rounded-full"
+          >
+            Update
+          </button>
+          <button
+            onClick={() => {
+              const streamIndex = topicStreams.findIndex(s => s.id === summary.streamId);
+              if (streamIndex >= 0) {
+                setViewMode('list');
+                setSelectedStream(topicStreams[streamIndex]);
+              }
+            }}
+            className="text-xs py-1 px-2 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-full"
+          >
+            View All
+          </button>
+        </div>
+      </div>
+      
+      {/* Summary Content */}
+      <div className="p-4">
+        <div className="prose prose-sm max-w-none dark:prose-invert">
+          <MarkdownRenderer content={summary.content || ''} />
+        </div>
+      </div>
+      
+      {/* Summary Sources */}
+      {summary.sources && summary.sources.length > 0 && (
+        <div className="px-4 pb-4">
+          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+          <div className="flex flex-wrap gap-1">
+            {summary.sources.map((source, index) => (
+              <a
+                key={index}
+                href={typeof source === 'string' ? source : source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
+                title={typeof source === 'string' ? source : (source.url || source)}
+              >
+                {typeof source === 'string' 
+                  ? source 
+                  : (source.name || source.url || source)}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#f7f7f8] dark:bg-[#1c1c1e]">
       {/* Header */}
-      <header className="bg-[#f7f7f8] dark:bg-[#2a2a2e] shadow-sm border-b border-slate-200 dark:border-slate-700">
+      <header className="bg-[#f7f7f8] dark:bg-[#2a2a2e] shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
-            className="text-3xl font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+            className="text-3xl font-bold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
             onClick={() => window.location.href = '/'}
           >
             TrendPulse Dashboard
           </h1>
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => setIsGridView(!isGridView)}
-              className="mr-4 text-sm px-3 py-1 rounded bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+              onClick={toggleViewMode}
+              className="mr-4 text-sm px-3 py-1 rounded bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 flex items-center"
             >
-              {isGridView ? 'List View' : 'Grid View'}
+              <span className="mr-1">{viewModeUI.icon}</span> {viewModeUI.text}
             </button>
             <button
               onClick={toggleTheme}
@@ -145,7 +416,7 @@ const Dashboard = () => {
 
       {/* Main content wrapper for width control */}
       <main className="py-6">
-        <div className={`${isGridView ? 'w-[95vw] mx-auto' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8`}>
+        <div className={`${viewMode === 'grid' ? 'container-fluid mx-auto' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8`}>
           {error && (
             <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded" data-testid="error-message">
               {error}
@@ -159,99 +430,223 @@ const Dashboard = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-12 gap-6">
-            {/* Sidebar: Conditionally render in DOM based on isGridView to simplify layout management */}
-            {!isGridView && (
-              <div className="col-span-12 md:col-span-3 bg-[#f0f0f1] dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                  <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
-                  <button
-                    onClick={() => setShowForm(true)}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 px-3 py-1 rounded text-sm border border-slate-300 dark:border-slate-600"
-                    data-testid="new-stream-button"
-                  >
-                    New Stream
-                  </button>
-                </div>
-                
-                {loading ? (
-                  <div className="p-4 text-center text-gray-500" data-testid="loading-indicator">
-                    <p>Loading streams...</p>
-                  </div>
-                ) : topicStreams.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500" data-testid="empty-streams-message">
-                    <p>No topic streams yet. Create your first one!</p>
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-slate-200 dark:divide-slate-700" data-testid="stream-list">
-                    {topicStreams.map(stream => (
-                      <li key={stream.id} data-testid={`stream-item-${stream.id}`}>
-                        <button
-                          className={`w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedStream?.id === stream.id ? 'bg-slate-200 dark:bg-slate-600 border-l-4 border-slate-500 dark:border-slate-400' : ''}`}
-                          onClick={() => setSelectedStream(stream)}
-                        >
-                          <div className="font-medium text-slate-700 dark:text-slate-300 h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
-                            {stream.query}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            {stream.update_frequency} • {stream.detail_level}
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            {/* Main content area */}
-            <div className={`col-span-12 ${!isGridView ? 'md:col-span-9' : 'md:col-span-12'}`}>
-              {showForm ? (
-                <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700" data-testid="stream-form-container">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Create New Topic Stream</h2>
+          {viewMode === 'mobile' ? (
+            <div className="flex flex-col">
+              {/* Mobile View Header - moved inside the container */}
+              {!showForm && topicStreams.length > 0 && !loading && !loadingSummaries && allSummaries.length > 0 ? (
+                <div className="mobile-feed pb-16 max-w-3xl mx-auto">
+                  <div className="flex justify-between items-center sticky top-[69px] pt-2 pb-4 bg-[#f7f7f8] dark:bg-[#1c1c1e] z-40">
+                    <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Latest Updates</h2>
                     <button
-                      onClick={() => setShowForm(false)}
-                      className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      onClick={() => setShowForm(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
                     >
-                      Cancel
+                      New Stream
                     </button>
                   </div>
-                  <TopicStreamForm onSubmit={handleCreateStream} />
+                  
+                  {/* Chronological feed of all summaries */}
+                  {allSummaries.map(summary => renderSummaryItem(summary))}
                 </div>
-              ) : isGridView ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {topicStreams.map(stream => (
-                    <TopicStreamWidget
-                      key={stream.id}
-                      stream={stream}
-                      onDelete={() => handleDeleteStream(stream.id)}
-                      onUpdate={handleUpdateStream}
-                      isGridView={true} 
-                    />
-                  ))}
-                  {topicStreams.length === 0 && !loading && (
-                    <div className="col-span-full bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 text-center border border-slate-200 dark:border-slate-700">
-                      <p className="text-slate-500 dark:text-slate-400">No topic streams available to display in grid view.</p>
-                    </div>
-                  )}
-                </div>
-              ) : selectedStream ? (
-                <TopicStreamWidget 
-                  stream={selectedStream} 
-                  onDelete={() => handleDeleteStream(selectedStream.id)} 
-                  onUpdate={handleUpdateStream}
-                  isGridView={false} 
-                />
               ) : (
-                <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 text-center border border-slate-200 dark:border-slate-700" data-testid="no-selection-message">
-                  <p className="text-slate-500 dark:text-slate-400">
-                    Select a topic stream or create a new one to get started
-                  </p>
-                </div>
+                <>
+                  {/* Mobile View Header - for empty states and form */}
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Latest Updates</h2>
+                    <button
+                      onClick={() => setShowForm(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                    >
+                      New Stream
+                    </button>
+                  </div>
+
+                  {/* Mobile View Content */}
+                  {loading || loadingSummaries ? (
+                    <div className="p-4 text-center text-gray-500">
+                      <div className="animate-pulse flex justify-center items-center space-x-2">
+                        <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                        <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                        <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                      </div>
+                      <p className="mt-2">Loading your feed...</p>
+                    </div>
+                  ) : topicStreams.length === 0 ? (
+                    <div className="p-8 text-center bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+                      <p className="text-slate-500 dark:text-slate-400 mb-4">No topic streams yet. Create your first one!</p>
+                      <button
+                        onClick={() => setShowForm(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                      >
+                        New Stream
+                      </button>
+                    </div>
+                  ) : showForm ? (
+                    <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700">
+                      <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Create New Topic Stream</h2>
+                        <button
+                          onClick={() => setShowForm(false)}
+                          className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <TopicStreamForm onSubmit={handleCreateStream} />
+                    </div>
+                  ) : allSummaries.length === 0 ? (
+                    <div className="p-8 text-center bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+                      <p className="text-slate-500 dark:text-slate-400 mb-4">No updates in your feed yet.</p>
+                      <p className="text-slate-500 dark:text-slate-400 mb-4">Try updating one of your streams to see content here.</p>
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-12 gap-6">
+              {/* Sidebar: Conditionally render in DOM based on viewMode to simplify layout management */}
+              {viewMode === 'list' && (
+                <div className="col-span-12 md:col-span-3 bg-[#f0f0f1] dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+                  <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                    <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
+                    <div className="flex space-x-2">
+                      {!loading && topicStreams.length > 0 && (
+                        <div className="text-xs text-slate-500 dark:text-slate-400 italic flex items-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                          </svg>
+                          Drag to reorder
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setShowForm(true)}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 px-3 py-1 rounded text-sm border border-slate-300 dark:border-slate-600"
+                        data-testid="new-stream-button"
+                      >
+                        New Stream
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {loading ? (
+                    <div className="p-4 text-center text-gray-500" data-testid="loading-indicator">
+                      <p>Loading streams...</p>
+                    </div>
+                  ) : topicStreams.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500" data-testid="empty-streams-message">
+                      <p>No topic streams yet. Create your first one!</p>
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-slate-200 dark:divide-slate-700" data-testid="stream-list">
+                      {topicStreams.map(stream => (
+                        <li 
+                          key={stream.id} 
+                          data-testid={`stream-item-${stream.id}`}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, stream.id)}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={(e) => handleDragOver(e, stream.id)}
+                          onDrop={(e) => handleDrop(e, stream.id)}
+                          className={`${dragOverStreamId === stream.id ? 'border-2 border-blue-400 dark:border-blue-600' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
+                        >
+                          <button
+                            className={`w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center ${selectedStream?.id === stream.id ? 'bg-slate-200 dark:bg-slate-600 border-l-4 border-slate-500 dark:border-slate-400' : ''}`}
+                            onClick={() => setSelectedStream(stream)}
+                          >
+                            <div className="mr-2 cursor-move text-slate-400 dark:text-slate-500">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-medium text-slate-700 dark:text-slate-300 h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
+                                {stream.query}
+                              </div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                {stream.update_frequency} • {stream.detail_level}
+                              </div>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Main content area */}
+              <div className={`${viewMode === 'list' ? 'col-span-12 md:col-span-9' : 'col-span-12'}`}>
+                {showForm ? (
+                  <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700" data-testid="stream-form-container">
+                    <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Create New Topic Stream</h2>
+                      <button
+                        onClick={() => setShowForm(false)}
+                        className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <TopicStreamForm onSubmit={handleCreateStream} />
+                  </div>
+                ) : viewMode === 'grid' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 auto-rows-auto">
+                    {/* We're going to render the top streams first, with consistent heights */}
+                    <div className="col-span-full pb-4 mb-4 flex flex-wrap gap-8">
+                      {topicStreams.slice(0, 5).map(stream => (
+                        <div key={stream.id} className="flex-1 min-w-[300px]" style={{ maxWidth: 'calc(25% - 24px)' }}>
+                          <TopicStreamWidget
+                            stream={stream}
+                            onDelete={() => handleDeleteStream(stream.id)}
+                            onUpdate={handleUpdateStream}
+                            isGridView={true} 
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Render remaining streams if there are more than 5 */}
+                    {topicStreams.length > 5 && (
+                      <>
+                        <div className="col-span-full border-t border-gray-200 dark:border-gray-700 py-4 mb-4">
+                          <h3 className="text-md font-medium text-gray-700 dark:text-gray-300">More Streams</h3>
+                        </div>
+                        {topicStreams.slice(5).map(stream => (
+                          <TopicStreamWidget
+                            key={stream.id}
+                            stream={stream}
+                            onDelete={() => handleDeleteStream(stream.id)}
+                            onUpdate={handleUpdateStream}
+                            isGridView={true} 
+                          />
+                        ))}
+                      </>
+                    )}
+                    
+                    {topicStreams.length === 0 && !loading && (
+                      <div className="col-span-full bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 text-center border border-slate-200 dark:border-slate-700">
+                        <p className="text-slate-500 dark:text-slate-400">No topic streams available to display in grid view.</p>
+                      </div>
+                    )}
+                  </div>
+                ) : viewMode === 'list' && selectedStream ? (
+                  <TopicStreamWidget 
+                    stream={selectedStream} 
+                    onDelete={() => handleDeleteStream(selectedStream.id)} 
+                    onUpdate={handleUpdateStream}
+                    isGridView={false} 
+                  />
+                ) : viewMode === 'list' ? (
+                  <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 text-center border border-slate-200 dark:border-slate-700" data-testid="no-selection-message">
+                    <p className="text-slate-500 dark:text-slate-400">
+                      Select a topic stream or create a new one to get started
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
