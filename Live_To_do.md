@@ -25,29 +25,30 @@
 - [x] Create core components
   - [x] Dashboard layout
   - [x] TopicStream listing component
-  - [x] TopicStream form
-  - [x] TopicStream Widget 
+  - [x] TopicStream form (updated to include sonar-deep-research, removed query length limit)
+  - [x] TopicStream Widget (extensive UI updates for grid/list views, title truncation, summary display)
   - [x] Deep Dive Dialog
 - [x] Implement Markdown Rendering
   - [x] Add markdown parser library (react-markdown)
-  - [x] Create MarkdownRenderer component
+  - [x] Create MarkdownRenderer component (updated to use MaskedSection for <think> tags)
   - [x] Add styling for markdown elements
   - [x] Handle code blocks and syntax highlighting
   - [x] Implement source citation formatting
   - [x] Add markdown preview in topic creation form
+  - [x] Create MaskedSection.jsx for <think> tag handling
 - [x] Add responsive design for mobile
   - [x] Adapt layout for small screens
   - [x] Implement mobile navigation
   - [x] Optimize form inputs for mobile
 - [x] UI Improvements from Prototype
-  - [x] Implement grid/list view toggle
-  - [x] Add improved card design with hover effects
+  - [x] Implement grid/list view toggle (significant styling for grid view cards and layout in Dashboard.jsx and TopicStreamWidget.jsx)
+  - [x] Add improved card design with hover effects (extensive card styling matching Perplexity/AI Studio, including borders, fonts, spacing)
   - [x] Create enhanced empty state UI
   - [x] Implement better loading states
   - [x] Add improved modals for topic creation and deep dive
 
 ## Priority 3: MVP Features
-- [ ] User Authentication
+- [x] User Authentication
   - [x] Login/Register functionality
   - [x] JWT token handling
   - [x] Protected routes
@@ -124,22 +125,22 @@
   - [x] Syntax highlighting for code blocks
   - [x] Save chat history in local storage
   - [x] Add option to save responses to stream
-  - [ ] **AI Model Selection for Deep Dive/Chat**
-    - [ ] **Frontend (DeepDiveChat.jsx / similar Component)**:
-      - [ ] Design and implement UI dropdown/selector for choosing AI model (e.g., `sonar`, `sonar-pro`, `sonar-reasoning`, `sonar-reasoning-pro`, `r1-1776`).
-      - [ ] Ensure selected model is passed in the API request to the backend.
-      - [ ] Update frontend state to manage and reflect the currently selected model for the active chat session.
-      - [ ] Clearly display the active model within the chat interface.
-      - [ ] Provide brief descriptions or tooltips for each model choice to guide user selection.
-    - [ ] **Backend (`app.py` - `/deep-dive/` endpoint & Perplexity API Client)**:
-      - [ ] Modify `DeepDiveRequest` Pydantic model to include an optional `model_selection: str` field.
-      - [ ] Update the `/deep-dive/` endpoint logic to use the `model_selection` from the request. If not provided, default to `sonar-reasoning`.
-      - [ ] Validate the `model_selection` against an approved list of models for chat (e.g., `['sonar', 'sonar-pro', 'sonar-reasoning', 'sonar-reasoning-pro', 'r1-1776']`).
-      - [ ] Ensure the `PerplexityAPI` client (`perplexity_api.py`) can dynamically set the model for the `/chat/completions` call based on this selection.
-      - [ ] Adjust any existing context handling or prompt engineering if specific models require slight variations for optimal chat performance.
-    - [ ] **Testing & Documentation**:
-      - [ ] Thoroughly test Deep Dive chat functionality with each of the selectable AI models.
-      - [ ] Verify correct model usage in Perplexity API calls via logging or testing headers.
+  - [x] **AI Model Selection for Deep Dive/Chat**
+    - [x] **Frontend (DeepDiveChat.jsx / similar Component)**:
+      - [x] Design and implement UI dropdown/selector for choosing AI model (e.g., `sonar`, `sonar-pro`, `sonar-reasoning`, `sonar-reasoning-pro`, `sonar-deep-research`).
+      - [x] Ensure selected model is passed in the API request to the backend.
+      - [x] Update frontend state to manage and reflect the currently selected model for the active chat session.
+      - [x] Clearly display the active model within the chat interface.
+      - [x] Provide brief descriptions or tooltips for each model choice to guide user selection.
+    - [x] **Backend (`app.py` - `/deep-dive/` endpoint & Perplexity API Client)**:
+      - [x] Modify `DeepDiveRequest` Pydantic model to include an optional `model_selection: str` field.
+      - [x] Update the `/deep-dive/` endpoint logic to use the `model_selection` from the request. If not provided, default to `sonar-reasoning`.
+      - [x] Validate the `model_selection` against an approved list of models for chat.
+      - [x] Ensure the `PerplexityAPI` client (`perplexity_api.py`) can dynamically set the model and timeout (longer for `sonar-deep-research`) for the `/chat/completions` call.
+      - [x] Adjust any existing context handling or prompt engineering if specific models require slight variations for optimal chat performance. (Dynamic `max_tokens` in `app.py` for topic streams also updated, benefiting `sonar-deep-research`)
+    - [x] **Testing & Documentation**:
+      - [x] Thoroughly test Deep Dive chat functionality with each of the selectable AI models. (User confirmed working)
+      - [x] Verify correct model usage in Perplexity API calls via logging or testing headers. (User confirmed working)
       - [ ] Update internal and external API documentation for the `/deep-dive/` endpoint to reflect the new `model_selection` parameter and its allowed values.
 
 ## Priority 4: Newspaper View Implementation
@@ -207,10 +208,10 @@
   - [ ] User guide
 
 ## Future Enhancements (Post-MVP)
-- [ ] Advanced Features
-  - [ ] Add sonar-pro model support
+- [x] Advanced Features
+  - [x] Add sonar-pro model support (also sonar-reasoning-pro and sonar-deep-research added to forms and chat)
   - [ ] Implement notifications
-  - [ ] Add multiple detail levels
+  - [x] Add multiple detail levels (Backend `max_tokens` dynamically adjusted for these)
   - [ ] Real-time updates
 - [ ] Performance Optimization
   - [ ] Caching implementation
@@ -222,9 +223,11 @@
   - [ ] Theme customization
 
 ## Current Focus
-Current focus is on completing Priority 3 items:
-- [ ] Implementing user authentication
-- [ ] Enhancing Topic Stream Management features
+Current focus is on completing Priority 3 items and refining Newspaper View (Priority 4).
+- [ ] Implementing user authentication (Note: Parts are checked, but overall feature might still be in progress)
+- [x] Enhancing Topic Stream Management features (Query length, model options, UI styling, truncation)
+- [x] UI Enhancements (Grid view, card styling, font consistency, masked sections - ongoing with Newspaper View)
+- [x] Backend API updates (Dynamic tokens for Perplexity, dynamic timeouts)
 
 ## Notes
 - Keep implementation simple and focused on MVP features
