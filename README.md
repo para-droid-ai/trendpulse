@@ -68,14 +68,14 @@ TrendPulse leverages a suite of Perplexity Sonar API models to provide diverse f
 - **Topic Stream Summaries**:
   - **`sonar`**: Used for generating concise, cost-effective summaries with real-time web search and citations. Ideal for frequent updates.
   - **`sonar-pro`**: Available for users seeking more in-depth summaries with a higher number of citations, leveraging its advanced information retrieval architecture.
-  - **`sonar-deep-research`**: For comprehensive and highly detailed summaries, utilizing extended token limits and processing time.
+  - **`sonar-deep-research`**: For comprehensive and highly detailed summaries, utilizing its exhaustive web research capabilities, extended token limits, and processing time.
 
 - **Deep Dive / Chat (Follow-up Q&A)**:
   - Users can select from the following models to tailor the chat experience:
     - **`sonar`**: For quick follow-up questions that may benefit from fast, fresh web searches based on the initial summary's context.
     - **`sonar-pro`**: For more complex follow-up questions requiring deeper information retrieval and more extensive source citations from the web.
-    - **`sonar-reasoning`** (Default): Excellent for multi-step reasoning, where the AI needs to "think" through a question based on the summary and potentially new search data. Provides Chain-of-Thought (CoT) responses.
-    - **`sonar-reasoning-pro`**: A premier reasoning model for highly complex follow-ups, offering enhanced CoT and more citations.
+    - **`sonar-reasoning`** (Default): Excellent for multi-step reasoning, where the AI needs to "think" through a question based on the summary and potentially new search data. Provides Chain-of-Thought (CoT) responses and performs real-time web searches.
+    - **`sonar-reasoning-pro`**: A premier reasoning model for highly complex follow-ups, offering enhanced CoT, more citations, and performs real-time web searches.
     - **`sonar-deep-research`**: Leverages its capability for **exhaustive web research across hundreds of sources**, a longer context window, and extended processing time. Ideal for in-depth exploration of topics, detailed analysis, and comprehensive answers that require synthesizing vast amounts of online information. *Backend uses an extended timeout for this model.*
   - This flexibility allows users to choose the best model for their specific follow-up query needs, balancing speed, depth, reasoning capability, and cost.
 
@@ -89,14 +89,14 @@ TrendPulse leverages a suite of Perplexity Sonar API models to provide diverse f
 - TailwindCSS for responsive, utility-first styling
 - React Router for navigation
 - Context API for state management
-- Markdown rendering with syntax highlighting
+- Markdown rendering with syntax highlighting (including `<think>` tag masking)
 - Responsive design for all device sizes
 
 ### Backend
 - FastAPI Python backend
 - SQLite database with SQLAlchemy ORM
 - JWT-based authentication
-- Background task scheduling
+- Background task scheduling (dynamic `max_tokens` and timeouts for Perplexity API calls)
 - Perplexity API integration
 - CORS middleware for cross-origin requests
 
@@ -109,7 +109,7 @@ TrendPulse leverages a suite of Perplexity Sonar API models to provide diverse f
 ## API Integration
 
 ### Perplexity API Features
-- Real-time web search capabilities
+- Real-time web search capabilities (including exhaustive research for `sonar-deep-research`)
 - Recency-filtered results
 - Source citation and verification
 - Multiple model options for different use cases
@@ -180,12 +180,13 @@ npm start
 - `DATABASE_URL`: SQLite database URL (default: `sqlite:///./trendpulse.db`).
 
 ## Project Structure
+(Mermaid diagram follows)
 
 ## Usage
 
 1. **Sign up and log in** to your TrendPulse Dashboard account.
 2. Click **"Add New Topic Stream"** to define a subject or query you want to track.
-3. Configure **update frequency** (hourly, daily, weekly), **detail level** (brief, detailed, comprehensive), and **model** (e.g., `sonar`, `sonar-pro`, `sonar-deep-research`).
+3. Configure **update frequency** (hourly, daily, weekly), **detail level** (brief, detailed, comprehensive), and **model** (e.g., `sonar`, `sonar-pro`, `sonar-reasoning`, `sonar-reasoning-pro`, `sonar-deep-research`).
 4. View your dashboard: each topic stream appears as a widget with the latest AI-generated summary and source citations.
 5. Click a widget to expand it, view the full summary, and **ask follow-up questions** in a chat interface.
 6. Receive **automated updates** as scheduled, with the dashboard refreshing summaries and sources.
@@ -194,17 +195,17 @@ npm start
 ## Perplexity API Usage
 
 - **Endpoint:** `POST /chat/completions`
-- **Parameters:**
-  - `model`: `sonar` or `sonar-pro` (user-selected per stream)
-  - `messages`:  
+- **Parameters (example for topic stream summary generation):**
+  - `model`: (user-selected per stream, e.g., `sonar`, `sonar-pro`, `sonar-deep-research`)
+  - `messages`:
     - System: Summarizes recent developments for the user's query, focusing on new information within the recency filter, and cites sources.
     - User: The user's topic or follow-up question.
   - `search_recency_filter`: Set based on update frequency (e.g., 'day', 'week')
   - `web_search_options.search_context_size`: `medium` or `high` (based on detail level)
-  - `max_tokens`: Based on detail level
-  - `temperature`: 0.1
-  - `top_p`: 0.8
-  - `top_k`: 0
+  - `max_tokens`: Based on detail level (dynamically set by backend)
+  - `temperature`: 0.1 (example value)
+  - `top_p`: 0.8 (example value)
+  - `top_k`: 0 (example value)
 - **Response:**
   - `summary`: AI-generated summary of recent developments
   - `citations`: List of source URLs
@@ -303,4 +304,6 @@ flowchart TB
   frontend --> src_front
   backend --> utils
 
+```
 
+</rewritten_file>
