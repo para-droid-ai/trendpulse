@@ -106,6 +106,20 @@ TrendPulse leverages a suite of Perplexity Sonar API models to provide diverse f
 - Perplexity API integration
 - CORS middleware for cross-origin requests
 
+### Context Handling for Stream Updates
+- **Prompting Strategy**: When updating topic streams, the system uses specialized prompts that explicitly request only new information since the last update.
+- **Recency Filtering**: Utilizes Perplexity's `search_recency_filter` parameter to limit search results to the appropriate timeframe (hourly, daily, weekly).
+- **Context Management**:
+  - Previous summaries are stored in the database with timestamps
+  - When requesting updates, the system includes the timestamp of the last update in the prompt
+  - The prompt instructs the model to focus exclusively on developments that occurred after the previous update
+  - The system explicitly asks the model to avoid repeating information already covered in previous summaries
+- **Incremental Updates**:
+  - Each new summary represents only the delta of information since the last check
+  - If no new relevant information is available, the system returns a clear "no updates" message rather than repeating old content
+  - The `<think>` tag feature allows the model to reason through what information is truly new without exposing this reasoning in the main content
+- **Prompt Engineering**: Carefully crafted system prompts include specific instructions like "Focus only on information published since [timestamp]" and "Do not repeat information from previous summaries"
+
 ### Data Models
 - User authentication and management
 - Topic streams with customizable settings
@@ -158,4 +172,31 @@ Set your Perplexity API key as an environment variable. For example, in Powershe
 ```powershell
 $env:PERPLEXITY_API_KEY="your_api_key_here"
 ```
-Or create a `.env` file in the `src/backend`
+Or create a `.env` file in the `src/backend` directory with the line:
+```
+PERPLEXITY_API_KEY=your_api_key_here
+```
+
+Run the backend server:
+```bash
+python app.py
+```
+
+### Frontend Setup
+Navigate to the frontend directory:
+```bash
+cd src/frontend
+```
+Install dependencies:
+```bash
+npm install
+```
+Run the frontend development server:
+```bash
+npm start
+```
+
+### Environment Variables (Backend - typically in `.env` file in `src/backend`)
+- `PERPLEXITY_API_KEY`: Your Perplexity API key.
+- `SECRET_KEY`: A strong secret key for JWT token generation (e.g., generate one using `openssl rand -hex 32`).
+- `DATABASE_URL`: SQLite database URL (default: `sqlite:///./trendpulse.db`).
