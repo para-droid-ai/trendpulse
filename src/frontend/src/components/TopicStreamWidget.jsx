@@ -124,9 +124,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
   if (showEditForm) {
     return (
-      <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 overflow-hidden shadow-sm`}>
+      <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-[#2a2a2e] rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm`}>
         <div className="p-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Topic Stream</h3>
+          <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-4">Edit Topic Stream</h3>
           <TopicStreamForm 
             onSubmit={handleEditSubmit}
             initialData={stream}
@@ -144,14 +144,14 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   }
 
   return (
-    <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col h-full`}>
-      <div className={`p-4 border-b dark:border-gray-700 flex ${isGridView ? 'flex-col items-start' : 'justify-between items-start'}`}>
+    <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-[#2a2a2e] border border-slate-200 dark:border-slate-700 shadow-sm rounded-lg overflow-hidden hover:shadow-md transition-shadow duration-200 flex flex-col h-full`}>
+      <div className={`p-4 border-b border-slate-200 dark:border-slate-700 flex ${isGridView ? 'flex-col items-start' : 'justify-between items-start'}`}>
         <div className={isGridView ? 'mb-2' : ''}>
           <h3 
-            className={`${isGridView ? 'text-xl font-bold mb-1 line-clamp-2 h-[3.5rem] flex items-center' : 'text-lg font-semibold line-clamp-2 h-[3.5rem] flex items-center'} text-gray-900 dark:text-white`}
+            className={`${isGridView ? 'text-xl font-semibold mb-1 h-[3.5rem] flex items-center' : 'text-lg font-semibold h-[3.5rem] flex items-center'} text-slate-700 dark:text-slate-300`}
             title={stream.query}  
           >
-            {stream.query}
+            <span className={`${isGridView ? 'line-clamp-2' : 'line-clamp-2'}`}>{stream.query}</span>
           </h3>
           {!isGridView && (
             <div className="flex flex-wrap gap-2 mt-2">
@@ -197,22 +197,20 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             <>
               <button
                 onClick={handleEdit}
-                className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                className="text-xs py-1 px-2 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 dark:border-slate-600 transition-colors"
               >
                 Edit
               </button>
               <button
                 onClick={handleUpdateNow}
                 disabled={updating}
-                className={`text-xs py-1 px-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${
-                  updating ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                className={`text-xs py-1 px-2 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 dark:border-slate-600 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {updating ? 'Updating...' : 'Update Now'}
               </button>
               <button
                 onClick={handleDeleteStream}
-                className="text-xs py-1 px-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                className="text-xs py-1 px-2 rounded bg-red-500 hover:bg-red-600 text-white dark:bg-red-600 dark:hover:bg-red-700 transition-colors"
               >
                 Delete Topic Stream
               </button>
@@ -228,7 +226,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
         </div>
       )}
 
-      <div className="divide-y dark:divide-gray-700 flex-grow overflow-y-auto">
+      <div className="divide-y divide-slate-200 dark:divide-slate-700 flex-grow overflow-y-auto">
         {loading ? (
           <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading summaries...</div>
         ) : summaries.length === 0 && !error ? (
@@ -305,9 +303,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
       {showDeepDive && selectedSummary && (
         <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[95vw] h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300">
+          <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-xl w-[95vw] h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-[#2a2a2e]">
+              <h3 className="text-lg font-medium text-slate-700 dark:text-slate-300">
                 Deep Dive: {stream.query}
               </h3>
               <button
@@ -321,9 +319,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             </div>
             
             <div className="flex flex-1 overflow-hidden">
-              <div className="w-1/2 h-full flex flex-col border-r dark:border-gray-700">
-                <h4 className="p-4 border-b text-md font-medium text-gray-700 dark:text-gray-300 sticky top-0 bg-white dark:bg-gray-800 z-10">Original Summary</h4>
-                <div className="flex-1 overflow-y-scroll p-4 bg-white dark:bg-gray-800">
+              <div className="w-1/2 h-full flex flex-col border-r border-slate-200 dark:border-slate-700">
+                <h4 className="p-4 border-b border-slate-200 text-md font-medium text-slate-700 dark:text-slate-300 sticky top-0 bg-white dark:bg-[#2a2a2e] z-10">Original Summary</h4>
+                <div className="flex-1 overflow-y-scroll p-4 bg-white dark:bg-[#2a2a2e]">
                   <MarkdownRenderer content={selectedSummary.content || ''} />
                   {selectedSummary.sources && selectedSummary.sources.length > 0 && (
                     <div className="mt-4">
@@ -362,11 +360,11 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
       {showDeleteStreamConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-[#2a2a2e] rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-4">
               Delete Topic Stream?
             </h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-slate-600 dark:text-slate-400 mb-6">
               Are you sure you want to delete the entire topic stream "{stream.query}"? This action cannot be undone, and all associated summaries will be permanently deleted.
             </p>
             <div className="flex justify-end space-x-3">

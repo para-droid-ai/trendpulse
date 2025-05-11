@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import AuthContext from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { topicStreamAPI } from '../services/api';
 import TopicStreamForm from '../components/TopicStreamForm';
 import TopicStreamWidget from '../components/TopicStreamWidget';
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
+  const { theme, toggleTheme } = useTheme();
   const [topicStreams, setTopicStreams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -106,12 +108,12 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen bg-[#f7f7f8] dark:bg-[#1c1c1e]">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
+      <header className="bg-[#f7f7f8] dark:bg-[#2a2a2e] shadow-sm border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
-            className="text-4xl font-bold uppercase text-black dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-sans" 
+            className="text-3xl font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
             onClick={() => window.location.href = '/'}
           >
             TrendPulse Dashboard
@@ -119,14 +121,21 @@ const Dashboard = () => {
           <div className="flex items-center space-x-4">
             <button
               onClick={() => setIsGridView(!isGridView)}
-              className="mr-4 text-sm px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
+              className="mr-4 text-sm px-3 py-1 rounded bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
             >
               {isGridView ? 'List View' : 'Grid View'}
             </button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</span>
+            <button
+              onClick={toggleTheme}
+              className="mr-4 text-sm px-3 py-1 rounded bg-gray-200 text-gray-700 border border-gray-300 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+            </button>
+            <span className="text-xs text-gray-600 dark:text-gray-400">{user?.email}</span>
             <button 
               onClick={logout}
-              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-700 dark:hover:text-gray-200"
             >
               Sign out
             </button>
@@ -153,12 +162,12 @@ const Dashboard = () => {
           <div className="grid grid-cols-12 gap-6">
             {/* Sidebar: Conditionally render in DOM based on isGridView to simplify layout management */}
             {!isGridView && (
-              <div className="col-span-12 md:col-span-3 bg-white dark:bg-gray-800 rounded-lg shadow">
-                <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-blue-300">Topic Streams</h2>
+              <div className="col-span-12 md:col-span-3 bg-[#f0f0f1] dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                  <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
                   <button
                     onClick={() => setShowForm(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 dark:hover:bg-indigo-500 text-white px-3 py-1 rounded text-sm"
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 px-3 py-1 rounded text-sm border border-slate-300 dark:border-slate-600"
                     data-testid="new-stream-button"
                   >
                     New Stream
@@ -174,17 +183,17 @@ const Dashboard = () => {
                     <p>No topic streams yet. Create your first one!</p>
                   </div>
                 ) : (
-                  <ul className="divide-y divide-gray-200 dark:divide-gray-700" data-testid="stream-list">
+                  <ul className="divide-y divide-slate-200 dark:divide-slate-700" data-testid="stream-list">
                     {topicStreams.map(stream => (
                       <li key={stream.id} data-testid={`stream-item-${stream.id}`}>
                         <button
-                          className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-700 ${selectedStream?.id === stream.id ? 'bg-indigo-50 dark:bg-indigo-900 border-l-4 border-indigo-600' : ''}`}
+                          className={`w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-700 ${selectedStream?.id === stream.id ? 'bg-slate-200 dark:bg-slate-600 border-l-4 border-slate-500 dark:border-slate-400' : ''}`}
                           onClick={() => setSelectedStream(stream)}
                         >
-                          <div className="font-medium text-gray-700 dark:text-gray-300 h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
+                          <div className="font-medium text-slate-700 dark:text-slate-300 h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
                             {stream.query}
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                             {stream.update_frequency} • {stream.detail_level}
                           </div>
                         </button>
@@ -198,12 +207,12 @@ const Dashboard = () => {
             {/* Main content area */}
             <div className={`col-span-12 ${!isGridView ? 'md:col-span-9' : 'md:col-span-12'}`}>
               {showForm ? (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6" data-testid="stream-form-container">
+                <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700" data-testid="stream-form-container">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-medium text-gray-900 dark:text-white">Create New Topic Stream</h2>
+                    <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Create New Topic Stream</h2>
                     <button
                       onClick={() => setShowForm(false)}
-                      className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
+                      className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                     >
                       Cancel
                     </button>
@@ -222,8 +231,8 @@ const Dashboard = () => {
                     />
                   ))}
                   {topicStreams.length === 0 && !loading && (
-                    <div className="col-span-full bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">
-                      <p className="text-gray-500 dark:text-gray-300">No topic streams available to display in grid view.</p>
+                    <div className="col-span-full bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 text-center border border-slate-200 dark:border-slate-700">
+                      <p className="text-slate-500 dark:text-slate-400">No topic streams available to display in grid view.</p>
                     </div>
                   )}
                 </div>
@@ -235,8 +244,8 @@ const Dashboard = () => {
                   isGridView={false} 
                 />
               ) : (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center" data-testid="no-selection-message">
-                  <p className="text-gray-500 dark:text-gray-300">
+                <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 text-center border border-slate-200 dark:border-slate-700" data-testid="no-selection-message">
+                  <p className="text-slate-500 dark:text-slate-400">
                     Select a topic stream or create a new one to get started
                   </p>
                 </div>
@@ -249,8 +258,8 @@ const Dashboard = () => {
       {/* Loading overlay for delete operation */}
       {isDeleting && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" data-testid="deleting-overlay">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-xl">
-            <p className="text-gray-700">Deleting topic stream...</p>
+          <div className="bg-white dark:bg-[#2a2a2e] rounded-lg p-4 shadow-xl">
+            <p className="text-slate-700 dark:text-slate-200">Deleting topic stream...</p>
           </div>
         </div>
       )}
