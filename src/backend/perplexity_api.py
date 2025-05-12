@@ -264,10 +264,14 @@ class PerplexityAPI:
             "messages": self._prepare_messages(query, previous_summary),
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "web_search_options": {
+        }
+        
+        # Only add web search options for non-R1 models
+        # R1-1776 is an offline model and shouldn't use web search
+        if model != "r1-1776":
+            payload["web_search_options"] = {
                 "search_context_size": "high" # Use high for better results by default
             }
-        }
 
         # Only add recency filter if it has a value, to handle "all_time"
         if api_recency_filter:
@@ -318,6 +322,11 @@ class PerplexityAPI:
                 else:
                     sources_list = self._extract_sources_from_content(content)
                     logger.debug(f"Extracted {len(sources_list)} sources from markdown content")
+                
+                # For R1-1776 model, always return empty sources list since it's an offline model
+                if model == "r1-1776":
+                    logger.info("Using R1-1776 offline model - returning empty sources list")
+                    sources_list = []
                 
                 # Return detailed response with list of sources
                 return {

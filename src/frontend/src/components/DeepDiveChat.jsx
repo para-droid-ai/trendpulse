@@ -2,6 +2,27 @@ import React, { useState, useEffect, useRef } from 'react';
 import { deepDiveAPI, topicStreamAPI } from '../services/api';
 import MarkdownRenderer from './MarkdownRenderer';
 
+// Helper function to format R1-1776 model responses for better readability
+const formatR1Response = (text) => {
+  if (!text) return '';
+  
+  // Add proper line breaks for paragraphs
+  let formatted = text
+    // Split on sentences to create more readable paragraphs
+    .replace(/\. /g, '.\n\n')
+    // Fix any excessive line breaks
+    .replace(/\n{3,}/g, '\n\n')
+    // Add markdown headers for better structure
+    .replace(/([A-Z][A-Za-z\s]{10,}:)/g, '\n## $1');
+  
+  // Add a markdown header at the beginning if none exists
+  if (!formatted.startsWith('#')) {
+    formatted = '## Summary\n\n' + formatted;
+  }
+  
+  return formatted;
+};
+
 const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([]);
@@ -42,7 +63,24 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
     setError('');
     try {
       const response = await deepDiveAPI.askQuestion(topicStreamId, summaryId, question, selectedModel);
-      const aiMsg = { id: Date.now()+1, type: 'ai', content: response.answer, sources: response.sources || [], model: response.model };
+      
+      // Format the response content based on the model type
+      let formattedContent = response.answer;
+      
+      // Special handling for R1-1776 model responses
+      if (selectedModel === 'r1-1776') {
+        // Split long paragraphs into proper markdown paragraphs
+        formattedContent = formatR1Response(response.answer);
+      }
+      
+      const aiMsg = { 
+        id: Date.now()+1, 
+        type: 'ai', 
+        content: formattedContent, 
+        sources: response.sources || [], 
+        model: response.model 
+      };
+      
       setMessages(prev => [...prev, aiMsg]);
     } catch (err) {
       console.error('Failed to get answer:', err);
