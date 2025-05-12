@@ -754,10 +754,23 @@ async def update_topic_stream(
             logger.warning(f"Topic stream {topic_stream_id} not found for user {current_user.id}")
             raise HTTPException(status_code=404, detail="Topic stream not found")
         
-        # Convert enum values
-        update_freq = UpdateFrequency(topic_stream.update_frequency)
-        detail_lvl = DetailLevel(topic_stream.detail_level)
-        model = ModelType(topic_stream.model_type)
+        # Convert enum values safely
+        try:
+            update_freq = UpdateFrequency(topic_stream.update_frequency)
+            detail_lvl = DetailLevel(topic_stream.detail_level)
+            
+            # Special handling for model_type to ensure r1-1776 works
+            if topic_stream.model_type == "r1-1776":
+                model = ModelType.R1_1776
+            else:
+                model = ModelType(topic_stream.model_type)
+                
+        except ValueError as e:
+            logger.error(f"Invalid enum value: {str(e)}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid enum value: {str(e)}"
+            )
         
         # Update the topic stream
         db_topic_stream.query = topic_stream.query
