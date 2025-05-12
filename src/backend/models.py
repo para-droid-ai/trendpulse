@@ -20,6 +20,7 @@ class ModelType(str, Enum):
     SONAR_REASONING = "sonar-reasoning"
     SONAR_REASONING_PRO = "sonar-reasoning-pro"
     SONAR_DEEP_RESEARCH = "sonar-deep-research"
+    R1_1776 = "r1-1776"
 
 class User(Base):
     __tablename__ = "users"

@@ -49,10 +49,12 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
     { value: 'sonar-pro', label: 'Sonar Pro' },
     { value: 'sonar-reasoning', label: 'Sonar Reasoning' },
     { value: 'sonar-reasoning-pro', label: 'Sonar Reasoning Pro' },
-    { value: 'sonar-deep-research', label: 'Sonar Deep Research' }
+    { value: 'sonar-deep-research', label: 'Sonar Deep Research' },
+    { value: 'r1-1776', label: 'R1-1776 (Offline)' }
   ];
   
   const recencyFilterOptions = [
+    { value: 'all_time', label: 'All Time' },
     { value: '1h', label: 'Last hour' },
     { value: '1d', label: 'Last day' },
     { value: '1w', label: 'Last week' },

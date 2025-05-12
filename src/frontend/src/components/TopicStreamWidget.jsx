@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { topicStreamAPI } from '../services/api';
-import { format } from 'date-fns';
+import { format, addHours, addDays, addWeeks, differenceInSeconds } from 'date-fns';
 import DeepDiveChat from './DeepDiveChat';
 import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
@@ -16,6 +16,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView, onSwipeLeft
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
+  const [nextUpdateCountdown, setNextUpdateCountdown] = useState('');
   
   // Touch handling for swipe gestures
   const touchStartX = useRef(null);
@@ -72,6 +73,73 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView, onSwipeLeft
       fetchSummaries();
     }
   }, [fetchSummaries, stream]);
+
+  // Effect for countdown timer
+  useEffect(() => {
+    if (!stream.last_updated || !stream.update_frequency) {
+      setNextUpdateCountdown('');
+      return;
+    }
+
+    const calculateNextUpdate = () => {
+      try {
+        const lastUpdatedDate = new Date(stream.last_updated);
+        if (isNaN(lastUpdatedDate.getTime())) {
+          // console.error('Invalid last_updated date:', stream.last_updated);
+          setNextUpdateCountdown('Invalid date');
+          return null;
+        }
+
+        let nextUpdateDate;
+        switch (stream.update_frequency) {
+          case 'hourly':
+            nextUpdateDate = addHours(lastUpdatedDate, 1);
+            break;
+          case 'daily':
+            nextUpdateDate = addDays(lastUpdatedDate, 1);
+            break;
+          case 'weekly':
+            nextUpdateDate = addWeeks(lastUpdatedDate, 1);
+            break;
+          default:
+            // console.error('Unknown update frequency:', stream.update_frequency);
+            setNextUpdateCountdown('Unknown frequency');
+            return null;
+        }
+        return nextUpdateDate;
+      } catch (e) {
+        // console.error('Error calculating next update date:', e);
+        setNextUpdateCountdown('Date calc error');
+        return null;
+      }
+    };
+
+    const updateCountdown = () => {
+      const nextUpdateDate = calculateNextUpdate();
+      if (!nextUpdateDate) return;
+
+      const now = new Date();
+      const diffSeconds = differenceInSeconds(nextUpdateDate, now);
+
+      if (diffSeconds <= 0) {
+        setNextUpdateCountdown('Updating soon / Overdue');
+        return;
+      }
+
+      const hours = Math.floor(diffSeconds / 3600);
+      const minutes = Math.floor((diffSeconds % 3600) / 60);
+      const seconds = diffSeconds % 60;
+
+      setNextUpdateCountdown(
+        `Next update in: ${hours > 0 ? hours + 'h ' : ''}${minutes > 0 ? minutes + 'm ' : ''}${seconds}s`
+      );
+    };
+
+    updateCountdown(); // Initial call
+    const intervalId = setInterval(updateCountdown, 1000); // Update every second
+
+    return () => clearInterval(intervalId); // Cleanup interval on unmount
+  }, [stream.last_updated, stream.update_frequency]);
 
   const handleUpdateNow = async () => {
     if (!stream || typeof stream.id === 'undefined') return;
@@ -209,6 +277,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView, onSwipeLeft
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
                 {stream.model_type}
               </span>
+              {/* Display Countdown Timer */}
+              {nextUpdateCountdown && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                  {nextUpdateCountdown}
+                </span>
+              )}
             </div>
           )}
         </div>
