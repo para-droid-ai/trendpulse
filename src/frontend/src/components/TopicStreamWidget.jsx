@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { topicStreamAPI } from '../services/api';
-import { format, addHours, addDays, addWeeks, differenceInSeconds } from 'date-fns';
+import { format, addHours, addDays, addWeeks, differenceInSeconds, subHours } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import DeepDiveChat from './DeepDiveChat';
 import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
@@ -266,6 +267,33 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView, onSwipeLeft
           >
             <span className={`${isGridView ? 'line-clamp-2' : 'line-clamp-2'}`}>{stream.query}</span>
           </h3>
+          {/* Show badges for model, frequency, and detail in grid view */}
+          {isGridView && (
+            <div className="flex flex-wrap gap-2 mt-1 mb-2">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                {stream.update_frequency}
+              </span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                {stream.detail_level}
+              </span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                {stream.model_type}
+              </span>
+            </div>
+          )}
+          {/* Always show EST regardless of browser timezone */}
+          <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-600 dark:text-gray-300" aria-label="Stream timestamps">
+            {stream.created_at && (
+              <span>
+                Created: {formatInTimeZone(subHours(new Date(stream.created_at), 3), 'America/New_York', 'MMM d, yyyy h:mm aaaa')} EST
+              </span>
+            )}
+            {stream.last_updated && (
+              <span>
+                Last updated: {formatInTimeZone(subHours(new Date(stream.last_updated), 3), 'America/New_York', 'MMM d, yyyy h:mm aaaa')} EST
+              </span>
+            )}
+          </div>
           {!isGridView && (
             <div className="flex flex-wrap gap-2 mt-2">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
@@ -357,7 +385,17 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView, onSwipeLeft
             <div key={summary.id} className="p-4 group relative" id={`summary-${summary.id}`}>
               <div className="mb-2 flex justify-between items-center">
                 <div className="text-sm text-slate-500 dark:text-slate-400 font-sans">
-                  {summary.created_at ? format(new Date(summary.created_at), 'MMM d, yyyy h:mm a') : 'Date unavailable'}
+                  {summary.created_at ? formatInTimeZone(subHours(new Date(summary.created_at), 3), 'America/New_York', 'MMM d, yyyy h:mm aaaa') + ' EST' : 'Date unavailable'}
+                  {summary.model && (
+                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      {summary.model}
+                    </span>
+                  )}
+                  {!summary.model && stream.model_type && (
+                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      {stream.model_type}
+                    </span>
+                  )}
                 </div>
                 {isGridView && (
                   <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">

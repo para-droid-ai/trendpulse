@@ -96,6 +96,7 @@ class SummaryResponse(BaseModel):
     content: str
     sources: List[str]
     created_at: datetime
+    model: str = ""
 
 class SummaryCreate(BaseModel):
     content: str
@@ -275,7 +276,8 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
                 topic_stream_id=topic_stream.id,
                 content=content,
                 sources=sources_json,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
+                model=model  # Save the model used for this summary
             )
             
             # Update topic stream's last_updated
@@ -498,7 +500,8 @@ def get_topic_stream_summaries(
                     id=summary.id,
                     content=summary.content,
                     sources=parsed_sources, # Use the parsed list
-                    created_at=summary.created_at
+                    created_at=summary.created_at,
+                    model=summary.model if summary.model is not None else ""
                 )
             )
         
@@ -577,7 +580,8 @@ async def update_topic_stream_now(
                 id=summary.id,
                 content=summary.content,
                 sources=parsed_sources,
-                created_at=summary.created_at
+                created_at=summary.created_at,
+                model=summary.model if summary.model is not None else ""
             )
         except Exception as e:
             logger.error(f"Error during search and summary creation: {str(e)}", exc_info=True)
@@ -655,10 +659,12 @@ def append_summary(
     if not topic_stream:
         raise HTTPException(status_code=404, detail="Topic stream not found")
     import json
+    # Try to use the current model_type from the topic stream for the summary
     new_summary = Summary(
         topic_stream_id=topic_stream_id,
         content=summary_create.content,
-        sources=json.dumps([])
+        sources=json.dumps([]),
+        model=str(topic_stream.model_type) if hasattr(topic_stream, 'model_type') and topic_stream.model_type else None
     )
     db.add(new_summary)
     db.commit()
@@ -669,7 +675,8 @@ def append_summary(
         id=new_summary.id,
         content=new_summary.content,
         sources=parsed_sources,
-        created_at=new_summary.created_at
+        created_at=new_summary.created_at,
+        model=new_summary.model
     )
 
 @app.delete("/topic-streams/{topic_stream_id}/summaries/{summary_id}")

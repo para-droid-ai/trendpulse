@@ -6,7 +6,9 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
     update_frequency: 'daily',
     detail_level: 'detailed',
     model_type: 'sonar-reasoning',
-    recency_filter: '1d'
+    recency_filter: '1d',
+    temperature: 0.7,
+    system_prompt: ''
   });
   
   const [errors, setErrors] = useState({});
@@ -19,7 +21,9 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
         update_frequency: initialData.update_frequency || 'daily',
         detail_level: initialData.detail_level || 'detailed',
         model_type: initialData.model_type || 'sonar-reasoning',
-        recency_filter: initialData.recency_filter || '1d'
+        recency_filter: initialData.recency_filter || '1d',
+        temperature: typeof initialData.temperature === 'number' ? initialData.temperature : 0.7,
+        system_prompt: typeof initialData.system_prompt === 'string' ? initialData.system_prompt : ''
       });
     } else {
       setFormData({
@@ -27,7 +31,8 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
         update_frequency: 'daily',
         detail_level: 'detailed',
         model_type: 'sonar-reasoning',
-        recency_filter: '1d'
+        recency_filter: '1d',
+        temperature: 0.7
       });
     }
   }, [initialData]);
@@ -63,8 +68,11 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
   ];
   
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    const { name, value, type } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === 'range' ? parseFloat(value) : value
+    });
     
     // Clear error for this field when user edits it
     if (errors[name]) {
@@ -106,6 +114,11 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
       newErrors.recency_filter = 'Please select a valid recency filter';
     }
     
+    // Validate temperature
+    if (formData.temperature < 0 || formData.temperature > 1) {
+      newErrors.temperature = 'Temperature must be between 0 and 1';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -127,7 +140,8 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
           update_frequency: 'daily',
           detail_level: 'detailed',
           model_type: 'sonar-reasoning',
-          recency_filter: '1d'
+          recency_filter: '1d',
+          temperature: 0.7
         });
       }
       setErrors({});
@@ -251,6 +265,43 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
           )}
         </div>
         
+        <div>
+          <label htmlFor="temperature" className="block text-sm font-medium text-gray-700">
+            Temperature <span className="ml-2 text-xs text-gray-500">({formData.temperature})</span>
+          </label>
+          <input
+            type="range"
+            id="temperature"
+            name="temperature"
+            min="0"
+            max="1"
+            step="0.01"
+            value={formData.temperature}
+            onChange={handleChange}
+            className="w-full mt-1"
+          />
+          {errors.temperature && (
+            <p className="mt-1 text-sm text-red-600">{errors.temperature}</p>
+          )}
+        </div>
+        
+        {/* Custom System Prompt */}
+        <div className="sm:col-span-2">
+          <label htmlFor="system_prompt" className="block text-sm font-medium text-gray-700">
+            Custom System Prompt <span className="text-xs text-gray-400">(optional)</span>
+          </label>
+          <textarea
+            id="system_prompt"
+            name="system_prompt"
+            value={formData.system_prompt}
+            onChange={handleChange}
+            rows={3}
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            placeholder="Enter a custom system prompt to override the default..."
+          />
+          <p className="mt-1 text-xs text-gray-500">If provided, this will replace the default system prompt for this stream.</p>
+        </div>
+
         <div>
           <label htmlFor="recency_filter" className="block text-sm font-medium text-gray-700">
             Recency Filter

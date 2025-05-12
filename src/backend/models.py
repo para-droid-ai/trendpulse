@@ -53,5 +53,6 @@ class Summary(Base):
     content = Column(String)
     sources = Column(String)  # Store as JSON string
     created_at = Column(DateTime, default=datetime.utcnow)
+    model = Column(String, nullable=True)  # Store model used for this summary
 
     topic_stream = relationship("TopicStream", back_populates="summaries")

@@ -30,6 +30,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   const [error, setError] = useState('');
   const [appendingId, setAppendingId] = useState(null);
   const [selectedModel, setSelectedModel] = useState('sonar-reasoning'); // Default model
+  const [withContext, setWithContext] = useState(true);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
@@ -62,7 +63,15 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await deepDiveAPI.askQuestion(topicStreamId, summaryId, question, selectedModel);
+      // Only send previous messages if withContext is true
+      let contextMessages = withContext ? messages : [];
+      const response = await deepDiveAPI.askQuestion(
+        topicStreamId,
+        summaryId,
+        question,
+        selectedModel,
+        { withContext, contextMessages }
+      );
       
       // Format the response content based on the model type
       let formattedContent = response.answer;
@@ -245,6 +254,20 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
               <option value="sonar-deep-research">Sonar Deep Research</option>
               <option value="r1-1776">R1-1776 (Offline)</option>
             </select>
+          </div>
+          <div className="flex items-center mt-2">
+            <input
+              id="with-context-checkbox"
+              type="checkbox"
+              checked={withContext}
+              onChange={e => setWithContext(e.target.checked)}
+              className="mr-2"
+              disabled={loading}
+            />
+            <label htmlFor="with-context-checkbox" className="text-xs text-gray-600 dark:text-gray-400 select-none">
+              Send previous chat context
+              <span className="ml-1 text-gray-400" title="If unchecked, only your current question will be sent to the model. Previous chat history will be omitted.">(?)</span>
+            </label>
           </div>
         </form>
       </div>
