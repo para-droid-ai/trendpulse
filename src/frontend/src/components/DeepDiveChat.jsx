@@ -118,7 +118,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
     <div className="flex flex-col h-full">
       <div className="p-3 border-b dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300">Follow-up Questions</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Follow-up Questions</h3>
           <p className="text-xs text-gray-500 dark:text-gray-200">Ask questions to explore this topic further</p>
         </div>
         {messages.length > 0 && (

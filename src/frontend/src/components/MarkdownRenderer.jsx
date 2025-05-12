@@ -27,7 +27,18 @@ export default function MarkdownRenderer({ content }) {
         section.type === 'think' ? (
           <MaskedSection key={i}>{section.value}</MaskedSection>
         ) : (
-          <ReactMarkdown key={i} remarkPlugins={[remarkGfm]}>{section.value}</ReactMarkdown>
+          <ReactMarkdown
+            key={i}
+            remarkPlugins={[remarkGfm]}
+            components={{
+              h1: ({node, ...props}) => <h2 {...props} />,
+              h2: ({node, ...props}) => <h2 {...props} />,
+              h3: ({node, ...props}) => <h2 {...props} />,
+              h4: ({node, ...props}) => <h2 {...props} />,
+              h5: ({node, ...props}) => <h2 {...props} />,
+              h6: ({node, ...props}) => <h2 {...props} />,
+            }}
+          >{section.value}</ReactMarkdown>
         )
       )}
     </div>
