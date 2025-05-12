@@ -269,9 +269,12 @@ class PerplexityAPI:
         # Only add web search options for non-R1 models
         # R1-1776 is an offline model and shouldn't use web search
         if model != "r1-1776":
+            logger.info(f"Using model {model} with web search enabled")
             payload["web_search_options"] = {
                 "search_context_size": "high" # Use high for better results by default
             }
+        else:
+            logger.info(f"Using R1-1776 offline model - web search DISABLED")
 
         # Only add recency filter if it has a value, to handle "all_time"
         if api_recency_filter:
@@ -325,8 +328,10 @@ class PerplexityAPI:
                 
                 # For R1-1776 model, always return empty sources list since it's an offline model
                 if model == "r1-1776":
-                    logger.info("Using R1-1776 offline model - returning empty sources list")
+                    logger.info(f"Using R1-1776 offline model - returning empty sources list (original had {len(sources_list)} sources)")
+                    # Force empty sources list for R1-1776
                     sources_list = []
+                    logger.info("Sources list cleared for R1-1776 model")
                 
                 # Return detailed response with list of sources
                 return {

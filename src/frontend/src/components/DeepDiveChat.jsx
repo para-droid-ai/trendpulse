@@ -154,7 +154,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
                 : <div className="text-sm"><MarkdownRenderer content={message.content} /></div>
               }
               
-              {message.type==='ai' && message.sources && message.sources.length > 0 && (
+              {message.type==='ai' && message.sources && message.sources.length > 0 && message.model !== 'r1-1776' && (
                 <div className="mt-2">
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
                   <div className="flex flex-wrap gap-1">
