@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from enum import Enum
@@ -41,6 +41,7 @@ class TopicStream(Base):
     model_type = Column(SQLEnum(ModelType))
     recency_filter = Column(String)
     last_updated = Column(DateTime, default=datetime.utcnow)
+    system_prompt = Column(Text, nullable=True)  # Custom prompt for this stream
 
     user = relationship("User", back_populates="topic_streams")
     summaries = relationship("Summary", back_populates="topic_stream")

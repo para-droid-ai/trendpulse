@@ -32,7 +32,8 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
         detail_level: 'detailed',
         model_type: 'sonar-reasoning',
         recency_filter: '1d',
-        temperature: 0.7
+        temperature: 0.7,
+        system_prompt: '' // Ensure system_prompt is initialized for new forms
       });
     }
   }, [initialData]);
@@ -141,7 +142,8 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
           detail_level: 'detailed',
           model_type: 'sonar-reasoning',
           recency_filter: '1d',
-          temperature: 0.7
+          temperature: 0.7,
+          system_prompt: ''
         });
       }
       setErrors({});

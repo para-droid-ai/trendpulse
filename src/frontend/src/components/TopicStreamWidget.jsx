@@ -6,16 +6,20 @@ import DeepDiveChat from './DeepDiveChat';
 import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
 import TopicStreamForm from './TopicStreamForm';
+import { formatModelType } from '../utils/formatters';
 
 const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView, onSwipeLeft, onSwipeRight }) => {
   const [summaries, setSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
   const [expandedSummaryId, setExpandedSummaryId] = useState(null);
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
+  
+
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
   const [nextUpdateCountdown, setNextUpdateCountdown] = useState('');
   
@@ -279,6 +283,17 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView, onSwipeLeft
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
                 {stream.model_type}
               </span>
+              {stream.system_prompt && (
+                <div className="mt-1 ml-2"> 
+                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center overflow-hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <span className="mr-1 flex-shrink-0">Custom Prompt:</span>
+                    <span className="italic truncate" title={stream.system_prompt}>{stream.system_prompt}</span>
+                  </p>
+                </div>
+              )}
             </div>
           )}
           {/* Always show EST regardless of browser timezone */}
@@ -305,6 +320,17 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView, onSwipeLeft
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
                 {stream.model_type}
               </span>
+              {stream.system_prompt && (
+                <div className="mt-1 ml-2"> 
+                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center overflow-hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <span className="mr-1 flex-shrink-0">Custom Prompt:</span>
+                    <span className="italic truncate" title={stream.system_prompt}>{stream.system_prompt}</span>
+                  </p>
+                </div>
+              )}
               {/* Display Countdown Timer */}
               {nextUpdateCountdown && (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">

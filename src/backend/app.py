@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime, timedelta
 from typing import List, Optional
+from enum import Enum
 import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
@@ -81,6 +82,7 @@ class TopicStreamCreate(BaseModel):
     detail_level: str     # Will be converted to DetailLevel
     model_type: str       # Will be converted to ModelType
     recency_filter: str
+    system_prompt: Optional[str] = None
 
 class TopicStreamResponse(BaseModel):
     id: int
@@ -90,6 +92,21 @@ class TopicStreamResponse(BaseModel):
     model_type: str
     recency_filter: str
     last_updated: Optional[datetime]
+    system_prompt: Optional[str] = None
+    
+    class Config:
+        orm_mode = True
+        from_attributes = True
+        
+        @classmethod
+        def schema_extra(cls, schema, model):
+            for prop in schema.get('properties', {}).values():
+                if prop.get('type') == 'string' and prop.get('format') == 'date-time':
+                    prop['format'] = 'date-time'
+                    
+        json_encoders = {
+            Enum: lambda v: v.value if isinstance(v, Enum) else v
+        }
 
 class SummaryResponse(BaseModel):
     id: int
@@ -111,6 +128,19 @@ class DeepDiveResponse(BaseModel):
     answer: str
     sources: List[str]
     model: str
+
+# Helper function to convert model objects to dict with proper enum handling
+def model_to_dict(obj):
+    if hasattr(obj, "__table__"):
+        result = {}
+        for key in obj.__table__.columns.keys():
+            value = getattr(obj, key)
+            if isinstance(value, Enum):
+                result[key] = value.value
+            else:
+                result[key] = value
+        return result
+    return obj
 
 # Database dependency
 def get_db():
@@ -198,29 +228,33 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
         # Use the model type from the topic stream
         model = topic_stream.model_type.value
         logger.debug(f"Using model from topic stream: {model}")
-        
-        # Modify query based on detail level and whether this is an update
-        query_prefix = ""
-        if topic_stream.detail_level == DetailLevel.BRIEF:
-            query_prefix = "Give a brief summary of "
-        elif topic_stream.detail_level == DetailLevel.DETAILED:
-            query_prefix = "Give a detailed analysis of "
-        
-        full_query = f"{query_prefix}{topic_stream.query}"
-        
-        # If this is an update (not the first summary), specifically ask for new information
-        if prev_summary_content:
-            full_query = f"Provide ONLY NEW information about {topic_stream.query} that wasn't in the previous summary. Focus on recent developments, news, and updates."
-        
-        if topic_stream.recency_filter != "all_time":
-            full_query += f" focusing on information from {topic_stream.recency_filter}"
-        
-        # Add instruction to format in markdown
-        full_query += ". Format your response using markdown for better readability."
-        
-        # If this is an update, add instruction to avoid repeating information
-        if prev_summary_content:
-            full_query += " DO NOT repeat information that was already covered previously."
+
+        # Use custom system prompt if provided
+        if hasattr(topic_stream, 'system_prompt') and topic_stream.system_prompt:
+            full_query = topic_stream.system_prompt
+        else:
+            # Modify query based on detail level and whether this is an update
+            query_prefix = ""
+            if topic_stream.detail_level == DetailLevel.BRIEF:
+                query_prefix = "Give a brief summary of "
+            elif topic_stream.detail_level == DetailLevel.DETAILED:
+                query_prefix = "Give a detailed analysis of "
+
+            full_query = f"{query_prefix}{topic_stream.query}"
+
+            # If this is an update (not the first summary), specifically ask for new information
+            if prev_summary_content:
+                full_query = f"Provide ONLY NEW information about {topic_stream.query} that wasn't in the previous summary. Focus on recent developments, news, and updates."
+
+            if topic_stream.recency_filter != "all_time":
+                full_query += f" focusing on information from {topic_stream.recency_filter}"
+
+            # Add instruction to format in markdown
+            full_query += ". Format your response using markdown for better readability."
+
+            # If this is an update, add instruction to avoid repeating information
+            if prev_summary_content:
+                full_query += " DO NOT repeat information that was already covered previously."
         
         logger.debug(f"Sending query to Perplexity API: {full_query}")
         
@@ -394,7 +428,8 @@ async def create_topic_stream(
             update_frequency=update_freq,
             detail_level=detail_lvl,
             model_type=model,
-            recency_filter=topic_stream.recency_filter
+            recency_filter=topic_stream.recency_filter,
+            system_prompt=topic_stream.system_prompt
         )
         
         logger.debug("Created TopicStream object")
@@ -441,11 +476,14 @@ def get_topic_streams(
         streams = db.query(TopicStream).filter(TopicStream.user_id == current_user.id).all()
         logger.debug(f"Found {len(streams)} topic streams for user {current_user.id}")
         
-        # Log each stream for debugging
+        # Convert model objects to dicts with proper enum handling
+        result = []
         for stream in streams:
-            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream.model_type}")
+            stream_dict = model_to_dict(stream)
+            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream_dict['model_type']}")
+            result.append(stream_dict)
             
-        return streams
+        return result
     except Exception as e:
         logger.error(f"Error fetching topic streams for user {current_user.id}: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -785,6 +823,7 @@ async def update_topic_stream(
         db_topic_stream.detail_level = detail_lvl
         db_topic_stream.model_type = model
         db_topic_stream.recency_filter = topic_stream.recency_filter
+        db_topic_stream.system_prompt = topic_stream.system_prompt
         
         db.commit()
         db.refresh(db_topic_stream)
