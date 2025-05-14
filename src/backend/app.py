@@ -35,6 +35,7 @@ from models import Base, User, TopicStream, Summary, UpdateFrequency, DetailLeve
 # from scheduler import TopicStreamScheduler
 from perplexity_api import PerplexityAPI
 from database import SessionLocal, engine
+import models  # Add missing models import
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -53,15 +54,13 @@ app = FastAPI(title="TrendPulse Dashboard API")
 
 # Configure CORS
 origins = [
-    "http://localhost:3000",  # React frontend default port
-    "http://127.0.0.1:3000",
-    "*",  # Allow any origin during development
-    # Add production URLs as needed
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow any origin during development
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -465,6 +464,15 @@ async def create_topic_stream(
             detail=f"Error creating topic stream: {str(e)}"
         )
 
+@app.get("/topic-streams/")
+async def get_topic_streams(db: Session = Depends(get_db)):
+    try:
+        streams = db.query(models.TopicStream).all()
+        return streams
+    except Exception as e:
+        logger.error(f"Error fetching topic streams: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching streams")
+
 @app.get("/topic-streams/", response_model=List[TopicStreamResponse])
 def get_topic_streams(
     current_user: User = Depends(get_current_user),
@@ -499,6 +507,9 @@ def get_topic_stream_summaries(
 ):
     try:
         logger.debug(f"Fetching summaries for topic stream ID: {topic_stream_id}")
+        
+        # Log before querying for topic stream
+        logger.debug(f"Querying for topic stream ID: {topic_stream_id} and user ID: {current_user.id}")
         topic_stream = db.query(TopicStream).filter(
             TopicStream.id == topic_stream_id,
             TopicStream.user_id == current_user.id
@@ -508,6 +519,8 @@ def get_topic_stream_summaries(
             logger.warning(f"Topic stream {topic_stream_id} not found for user {current_user.id}")
             raise HTTPException(status_code=404, detail="Topic stream not found")
         
+        # Log before querying for summaries
+        logger.debug(f"Querying for summaries for topic stream ID: {topic_stream_id}")
         summaries_db = db.query(Summary).filter(Summary.topic_stream_id == topic_stream_id).order_by(Summary.created_at.desc()).all()
         logger.debug(f"Found {len(summaries_db)} summaries for topic stream {topic_stream_id}")
         
@@ -515,6 +528,8 @@ def get_topic_stream_summaries(
         response_summaries = []
         for summary in summaries_db:
             parsed_sources = []
+            # Log before processing sources
+            logger.debug(f"Processing sources for summary ID: {summary.id}")
             if summary.sources: # Check if sources string is not None or empty
                 try:
                     # First ensure it's a string - it might already be parsed in some cases
@@ -531,8 +546,13 @@ def get_topic_stream_summaries(
                 except json.JSONDecodeError:
                     logger.warning(f"Failed to decode sources JSON for summary {summary.id}: {summary.sources}")
                     parsed_sources = [] # Default to empty list on error
-            
-            logger.debug(f"Processed summary {summary.id} with {len(parsed_sources)} sources")
+                except Exception as source_parse_error:
+                    # Catch any other errors during source parsing
+                    logger.error(f"Unexpected error parsing sources for summary {summary.id}: {str(source_parse_error)}", exc_info=True)
+                    parsed_sources = []
+
+            # Log before appending summary to response
+            logger.debug(f"Appending summary ID: {summary.id} to response")
             response_summaries.append(
                 SummaryResponse(
                     id=summary.id,
@@ -544,9 +564,13 @@ def get_topic_stream_summaries(
             )
         
         return response_summaries # Return the manually constructed list
+    except HTTPException as http_exc: 
+        # Re-raise HTTPException to preserve status code and details
+        raise http_exc
     except Exception as e:
         logger.error(f"Error fetching summaries: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error fetching summaries: {str(e)}")
+        # Re-raise as HTTPException to return to the frontend
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while fetching summaries: {str(e)}")
 
 @app.delete("/topic-streams/{topic_stream_id}")
 def delete_topic_stream(

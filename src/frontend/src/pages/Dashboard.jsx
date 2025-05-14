@@ -3,7 +3,7 @@ import AuthContext from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { topicStreamAPI } from '../services/api';
 import TopicStreamForm from '../components/TopicStreamForm';
-import TopicStreamWidget from '../components/TopicStreamWidget';
+import TopicStreamWidget from '../components/TopicStreamWidget'; // Correct relative path
 import { format } from 'date-fns';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
@@ -59,6 +59,8 @@ const Dashboard = () => {
     try {
       // Fetch summaries for each stream
       const summariesPromises = topicStreams.map(stream => 
+        // Add a check here to ensure the stream object is valid and has an id
+        stream && stream.id ? 
         topicStreamAPI.getSummaries(stream.id)
           .then(summaries => summaries.map(summary => ({
             ...summary,
@@ -67,6 +69,7 @@ const Dashboard = () => {
             // Ensure we have a valid date for sorting
             created_at: summary.created_at || new Date().toISOString()
           })))
+        : Promise.resolve([]) // If stream is invalid, resolve with an empty array
       );
       
       const results = await Promise.all(summariesPromises);
@@ -168,10 +171,10 @@ const Dashboard = () => {
     }
     
     // If switching to mobile view and we have streams, fetch summaries
-    if (viewMode === 'mobile' && topicStreams.length > 0 && allSummaries.length === 0) {
+    if (viewMode === 'mobile' && topicStreams.length > 0) {
       fetchAllSummaries();
     }
-  }, [topicStreams, currentMobileIndex, viewMode, allSummaries.length, fetchAllSummaries]);
+  }, [topicStreams, currentMobileIndex, viewMode, fetchAllSummaries]);
 
   const handleCreateStream = async (newStream) => {
     try {
