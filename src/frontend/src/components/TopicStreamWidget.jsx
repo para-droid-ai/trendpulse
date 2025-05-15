@@ -7,6 +7,56 @@ import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
 import TopicStreamForm from './TopicStreamForm';
 
+// Custom locale for abbreviated distance
+const customDistanceLocale = {
+  lessThanXSeconds: { one: 'just now', other: '{{count}}s ago' },
+  xSeconds: { one: '{{count}}s ago', other: '{{count}}s ago' },
+  halfAMinute: '30s ago',
+  lessThanXMinutes: { one: '1m ago', other: '{{count}}m ago' },
+  xMinutes: { one: '{{count}}m ago', other: '{{count}}m ago' },
+  aboutXHours: { one: '1h ago', other: '{{count}}h ago' },
+  xHours: { one: '{{count}}h ago', other: '{{count}}h ago' },
+  xDays: { one: '1d ago', other: '{{count}}d ago' },
+  aboutXWeeks: { one: '1wk ago', other: '{{count}}wk ago' },
+  xWeeks: { one: '{{count}}wk ago', other: '{{count}}wk ago' },
+  aboutXMonths: { one: '1mo ago', other: '{{count}}mo ago' },
+  xMonths: { one: '{{count}}mo ago', other: '{{count}}mo ago' },
+  aboutXYears: { one: '1yr ago', other: '{{count}}yr ago' },
+  xYears: { one: '{{count}}yr ago', other: '{{count}}yr ago' },
+  overXYears: { one: 'over 1yr ago', other: 'over {{count}}yr ago' },
+  almostXYears: { one: 'almost 1yr ago', other: 'almost {{count}}yr ago' },
+};
+
+function formatDistanceLocale(token, count, options) {
+  options = options || {};
+
+  const result = customDistanceLocale[token];
+
+  if (typeof result === 'string') {
+    return result.replace('{{count}}', count);
+  }
+
+  if (options.addSuffix) {
+    if (options.comparison > 0) {
+      return 'in ' + result.one.replace('{{count}}', count);
+    } else {
+      return result.other.replace('{{count}}', count);
+    }
+  } else {
+     // Simple case without suffix (though formatDistanceToNowStrict uses suffix) 
+     // We'll return the 'other' form as a fallback.
+     return result.other.replace('{{count}}', count);
+  }
+}
+
+const localeWithAbbreviation = { 
+    formatDistance: formatDistanceLocale,
+    // Include other locale properties if needed, but formatDistance is key
+    localize: {}, // Assuming we don't need custom localization strings for now
+    match: {}, // Assuming we don't need custom matching for now
+    options: {},
+};
+
 const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   const [summaries, setSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -244,7 +294,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   console.log('User Time Zone:', userTimeZone);
 
   const timeSinceLastUpdate = lastUpdateTimestamp
-    ? formatDistanceToNowStrict(toZonedTime(parseISO(lastUpdateTimestamp + 'Z'), userTimeZone), { addSuffix: true })
+    ? formatDistanceToNowStrict(toZonedTime(parseISO(lastUpdateTimestamp + 'Z'), userTimeZone), { addSuffix: true, locale: localeWithAbbreviation })
     : 'Never updated';
 
   return (
@@ -266,17 +316,18 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               <h3 className={`text-lg font-semibold text-gray-900 dark:text-white ${isGridView ? 'line-clamp-3' : 'truncate'}`}>
                 {stream.query}
               </h3>
-              <div className="flex flex-wrap gap-2 mt-2">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              <div className="flex flex-wrap gap-2 mt-2">{/* Ensure wrapping */}
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex-shrink-0">{/* flex-shrink-0 */}
                   {stream.update_frequency}
                 </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 flex-shrink-0">{/* flex-shrink-0 */}
                   {stream.detail_level}
                 </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 flex-shrink-0">{/* flex-shrink-0 */}
                   {stream.model_type}
                 </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                {/* Time Since Last Update - Keep with other badges */}
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 flex-shrink-0">{/* flex-shrink-0 */}
                   {timeSinceLastUpdate}
                 </span>
               </div>
@@ -284,35 +335,41 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             
             {/* Buttons - right side, need conditional layout */}
             {isGridView ? (
-              <div className="flex space-x-1 items-center relative"> {/* Left-aligned */}
-                {/* Edit Button for Grid View */}
+              <div className="flex space-x-1 items-center relative flex-shrink-0 justify-end">{/* Right-aligned buttons */}
+                {/* Edit Button for Grid View - Icon */}
                 <button
                   onClick={handleEdit}
-                  className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                  className="text-xs p-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  title="Edit Stream"
                 >
-                  Edit
+                  {/* Pencil Icon */}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
                 </button>
 
-                {/* Update Now Button for Grid View */}
+                {/* Update Now Button for Grid View - Icon */}
                 <button
                   onClick={handleUpdateNow}
                   disabled={updating}
-                  className={`text-xs py-1 px-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${
-                    updating ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
+                  className={`text-xs p-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={updating ? 'Updating...' : 'Update Now'}
                 >
-                  {updating ? 'Updating...' : 'Update Now'}
+                   {/* Using SVG file from public folder */}
+                   <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
                 </button>
 
-                {/* Delete Button for Grid View */}
+                {/* Delete Button for Grid View - Icon */}
                 <button
                   onClick={handleDeleteStream}
-                  className="text-xs py-1 px-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  className="text-xs p-1 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  title="Delete Stream"
                 >
-                  Delete Stream
+                   {/* Using trashcan SVG file from public folder */}
+                   <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
                 </button>
 
-                {/* Export Button for Grid View */}
+                {/* Export Button for Grid View - Remains text */}
                 <button
                   onClick={() => setShowExportOptions(!showExportOptions)}
                   className="text-xs py-1 px-2 rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors"
