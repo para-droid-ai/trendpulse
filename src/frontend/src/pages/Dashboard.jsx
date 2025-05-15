@@ -7,6 +7,8 @@ import TopicStreamWidget from '../components/TopicStreamWidget'; // Correct rela
 import { format } from 'date-fns';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import DeepDiveChat from '../components/DeepDiveChat';
+import { formatDistanceToNowStrict, parseISO } from 'date-fns';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -70,6 +72,7 @@ const Dashboard = () => {
             ...summary,
             streamQuery: stream.query,
             streamId: stream.id,
+            detail_level: stream.detail_level,
             // Ensure we have a valid date for sorting
             created_at: summary.created_at || new Date().toISOString()
           })))
@@ -341,79 +344,111 @@ const Dashboard = () => {
   const viewModeUI = getViewModeUI();
 
   // Render a single summary item for the mobile feed
-  const renderSummaryItem = (summary) => (
-    <div key={summary.id} className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 mb-4">
-      {/* Summary Header */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 line-clamp-1 max-w-[75%]" title={summary.streamQuery}>{summary.streamQuery}</h3>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {summary.created_at ? format(new Date(summary.created_at), 'MMM d, yyyy h:mm a') : ''}
-          </span>
-        </div>
-        
-        {/* Stream Actions */}
-        <div className="flex space-x-2">
-          <button 
-            onClick={() => {
-              const stream = topicStreams.find(s => s.id === summary.streamId);
-              if (stream) handleUpdateNow(stream.id);
-            }}
-            className="text-xs py-1 px-2 bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-200 rounded-full"
-          >
-            Update
-          </button>
-          <button
-            onClick={() => {
-              const streamIndex = topicStreams.findIndex(s => s.id === summary.streamId);
-              if (streamIndex >= 0) {
-                setViewMode('list');
-                setSelectedStream(topicStreams[streamIndex]);
-              }
-            }}
-            className="text-xs py-1 px-2 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-full"
-          >
-            View All
-          </button>
-        </div>
-      </div>
-      
-      {/* Summary Content */}
-      <div className="p-4">
-        <div className="prose prose-sm max-w-none dark:prose-invert">
-          <MarkdownRenderer content={summary.content || ''} />
-        </div>
-      </div>
-      
-      {/* Summary Sources */}
-      {summary.sources && summary.sources.length > 0 && (
-        <div className="px-4 pb-4">
-          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
-          <div className="flex flex-wrap gap-1">
-            {summary.sources.map((source, index) => (
-              <a
-                key={index}
-                href={typeof source === 'string' ? source : source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
-                title={typeof source === 'string' ? source : (source.url || source)}
+  const renderSummaryItem = (summary) => {
+    return (
+      <div key={summary.id} className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 mb-4 p-3">
+        {/* Summary Header */}
+        <div className="border-b border-slate-200 dark:border-slate-700 sticky top-[69px] bg-white dark:bg-[#2a2a2e] z-10 pb-3">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 line-clamp-2 max-w-[80%] Camino text-ellipsis overflow-hidden" title={summary.streamQuery}>{summary.streamQuery}</h3>
+            {/* Combine Timestamp and Deep Dive button in a right-aligned container */}
+            <div className="flex flex-col items-end flex-shrink-0">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 font-medium">
+                {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
+              </span>
+              {/* Deep Dive Chat button */}
+              <button
+                onClick={() => {
+                  setShowDeepDive(true);
+                  setSelectedSummary(summary);
+                }}
+                className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full mt-1"
               >
-                {typeof source === 'string' 
-                  ? source 
-                  : (source.name || source.url || source)}
-              </a>
-            ))}
+                Deep Dive Chat
+              </button>
+            </div>
+          </div>
+          
+          {/* Stream Actions and additional info badges - Now on the same line */}
+          <div className="flex flex-wrap gap-2 items-center">
+             {/* Model Badge */}
+             {summary.model && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                {summary.model}
+              </span>
+            )}
+             {/* Detail Level Badge - use stream's detail level */}
+             {summary.detail_level && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                {summary.detail_level}
+              </span>
+            )}
+
+            {/* Update and View All buttons - Moved here */}
+            {/* Update button */}
+            <button
+              onClick={() => {
+                const stream = topicStreams.find(s => s.id === summary.streamId);
+                if (stream) handleUpdateNow(stream.id);
+              }}
+              className="text-xs py-1 px-2 bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-200 rounded-full"
+            >
+              Update
+            </button>
+
+            {/* View All button */}
+            <button
+              onClick={() => {
+                const streamIndex = topicStreams.findIndex(s => s.id === summary.streamId);
+                if (streamIndex >= 0) {
+                  setViewMode('list');
+                  setSelectedStream(topicStreams[streamIndex]);
+                }
+              }}
+              className="text-xs py-1 px-2 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-full"
+            >
+              View All
+            </button>
           </div>
         </div>
-      )}
-    </div>
-  );
+        
+        {/* Summary Content */}
+        <div className="p-4 pt-2">
+          <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? '' : ''}`}>
+            <MarkdownRenderer content={summary.content || ''} />
+          </div>
+        </div>
+        
+        {/* Summary Sources */}
+        {summary.sources && summary.sources.length > 0 && (
+          <div className="px-4 pb-4">
+            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+            <div className="flex flex-wrap gap-1">
+              {summary.sources.map((source, index) => (
+                <a
+                  key={index}
+                  href={typeof source === 'string' ? source : source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
+                  title={typeof source === 'string' ? source : (source.url || source)}
+                >
+                  {typeof source === 'string' 
+                    ? source 
+                    : (source.name || source.url || source)}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#1c1c1e]' : 'bg-[#f7f7f8]'}`}>
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#1c1c1e]' : 'bg-slate-100'}`}>
       {/* Header */}
-      <header className={`shadow-sm border-b dark:border-slate-700 sticky top-0 z-50 ${theme === 'dark' ? 'bg-[#2a2a2e]' : 'bg-[#f7f7f8]'}`}>
+      <header className={`shadow-sm border-b ${theme === 'dark' ? 'border-slate-700 bg-[#2a2a2e]' : 'border-slate-200 bg-white'} sticky top-0 z-20 w-full`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
             className="text-3xl font-bold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
@@ -467,7 +502,7 @@ const Dashboard = () => {
               {/* Mobile View Header - moved inside the container */}
               {!showForm && topicStreams.length > 0 && !loading && !loadingSummaries && allSummaries.length > 0 ? (
                 <div className="mobile-feed pb-16 max-w-3xl mx-auto">
-                  <div className="flex justify-between items-center sticky top-[69px] pt-2 pb-4 bg-[#f7f7f8] dark:bg-[#1c1c1e] z-40">
+                  <div className="flex justify-between items-center pt-2 pb-4 bg-[#f7f7f8] dark:bg-[#1c1c1e] z-40">
                     <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Latest Updates</h2>
                     <button
                       onClick={() => setShowForm(true)}
@@ -539,18 +574,11 @@ const Dashboard = () => {
             <div className="grid grid-cols-12 gap-6">
               {/* Sidebar: Conditionally render in DOM based on viewMode to simplify layout management */}
               {viewMode === 'list' && (
-                <div className="col-span-12 md:col-span-3 bg-[#f0f0f1] dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
-                  <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                    <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
-                    <div className="flex space-x-2">
-                      {!loading && topicStreams.length > 0 && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 italic flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                          </svg>
-                          Drag to reorder
-                        </div>
-                      )}
+                <div className={`col-span-12 md:col-span-3 rounded-lg shadow-sm ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200 shadow-md'} sticky top-[69px] h-screen overflow-y-auto`}>
+                  <div className={`p-4 border-b ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                    {/* Header Row */}
+                    <div className="flex justify-between items-center mb-2">
+                      <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
                       <button
                         onClick={() => setShowForm(true)}
                         className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 px-3 py-1 rounded text-sm border border-slate-300 dark:border-slate-600"
@@ -559,6 +587,16 @@ const Dashboard = () => {
                         New Stream
                       </button>
                     </div>
+                    
+                    {/* Drag to reorder text below header row */}
+                    {!loading && topicStreams.length > 0 && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400 italic flex items-center mt-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                        Drag to reorder
+                      </div>
+                    )}
                   </div>
                   
                   {loading ? (
@@ -610,7 +648,7 @@ const Dashboard = () => {
               {/* Main content area */}
               <div className={`${viewMode === 'list' ? 'col-span-12 md:col-span-9' : 'col-span-12'}`}>
                 {showForm ? (
-                  <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700" data-testid="stream-form-container">
+                  <div className={`rounded-lg shadow-sm p-6 ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200'}`}>
                     <div className="flex justify-between items-center mb-6">
                       <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Create New Topic Stream</h2>
                       <button
@@ -645,20 +683,24 @@ const Dashboard = () => {
                           <h3 className="text-md font-medium text-gray-700 dark:text-gray-300">More Streams</h3>
                         </div>
                         {topicStreams.slice(5).map(stream => (
-                          <TopicStreamWidget
-                            key={stream.id}
-                            stream={stream}
-                            onDelete={() => handleDeleteStream(stream.id)}
-                            onUpdate={handleUpdateStream}
-                            isGridView={true} 
-                          />
+                          <div key={stream.id}>
+                            <TopicStreamWidget
+                              key={stream.id}
+                              stream={stream}
+                              onDelete={() => handleDeleteStream(stream.id)}
+                              onUpdate={handleUpdateStream}
+                              isGridView={true} 
+                            />
+                          </div>
                         ))}
                       </>
                     )}
                     
                     {topicStreams.length === 0 && !loading && (
-                      <div className="col-span-full bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 text-center border border-slate-200 dark:border-slate-700">
-                        <p className="text-slate-500 dark:text-slate-400">No topic streams available to display in grid view.</p>
+                      <div className={`col-span-full rounded-lg shadow-sm p-6 text-center ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <p className="text-slate-500 dark:text-slate-400">
+                          No topic streams available to display in grid view.
+                        </p>
                       </div>
                     )}
                   </div>
@@ -670,7 +712,7 @@ const Dashboard = () => {
                     isGridView={false} 
                   />
                 ) : viewMode === 'list' ? (
-                  <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 text-center border border-slate-200 dark:border-slate-700" data-testid="no-selection-message">
+                  <div className={`rounded-lg shadow-sm p-6 text-center ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200'}`}>
                     <p className="text-slate-500 dark:text-slate-400">
                       Select a topic stream or create a new one to get started
                     </p>
@@ -692,8 +734,8 @@ const Dashboard = () => {
       )}
 
       {showDeepDive && selectedSummary && (
-        <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" style={{ maxWidth: '1000px !important' }}>
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
               {/* Truncated Stream Title */}
               <div className="flex-1 overflow-hidden min-w-0 mr-4">
@@ -712,46 +754,25 @@ const Dashboard = () => {
             </div>
 
             {/* Main content area with two columns */}
-            <div className="flex flex-1 overflow-hidden flex-row">
+            <div className="flex overflow-hidden flex-row w-full">
 
               {/* Original Summary Section - Left Column */}
-              <div className="w-1/2 p-4 border-r dark:border-gray-700 overflow-y-auto">
+              <div className="p-4 border-r dark:border-gray-700 overflow-y-auto flex-grow basis-0">
                 <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Original Summary</h4>
                 {/* Render summary with potential truncation and Read More - Keep as is for now */}
-                <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? '' : ''}`}> {/* Removed line-clamp, summary should be fully visible */}
+                <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? '' : ''}`}>
                     <MarkdownRenderer content={selectedSummary.content} />
                 </div>
-                 {/* Removed Read More button - summary is fully visible */}
-                 
-                {/* Summary Sources - Moved below summary content - Keep as is for now */}
-                {selectedSummary.sources && selectedSummary.sources.length > 0 && (
-                    <div className="mt-4">
-                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
-                        <div className="flex flex-wrap gap-1">
-                            {selectedSummary.sources.map((source, index) => (
-                                <a
-                                    key={index}
-                                    href={source}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900 px-2 py-1 rounded-full truncate max-w-[200px]"
-                                >
-                                    {source}
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                )}
               </div>
 
               {/* Deep Dive Chat Section - Right Column */}
-              <div className="flex-1 overflow-hidden">
-                <DeepDiveChat 
-                  topicStreamId={selectedStream.id}
-                  summaryId={selectedSummary.id}
-                  topic={selectedStream.query}
-                  onAppend={handleAppendSummary}
-                />
+              <div className="p-4 border-l dark:border-gray-700 overflow-y-auto flex-grow basis-0">
+                 <DeepDiveChat 
+                    topicStreamId={selectedStream.id} 
+                    summaryId={selectedSummary.id}
+                    topic={selectedStream.query}
+                    onAppend={handleAppendSummary}
+                  />
               </div>
             </div>
           </div>
@@ -761,4 +782,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

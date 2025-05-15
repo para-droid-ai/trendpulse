@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) => {
+const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCancel }) => {
   const [formData, setFormData] = useState({
     query: '',
     update_frequency: 'daily',
@@ -170,13 +170,13 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
           Topic Query <span className="text-red-500">*</span>
         </label>
         <div className="mt-1">
-          <input
-            type="text"
+          <textarea
             name="query"
             id="query"
             value={formData.query}
             onChange={handleChange}
-            className={`shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md ${
+            rows={3}
+            className={`shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md resize-y ${
               errors.query ? 'border-red-500' : ''
             }`}
             placeholder="Enter a topic query, e.g., 'latest AI developments'"
@@ -330,17 +330,25 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false }) =>
         </div>
       </div>
       
-      <div className="pt-4">
+      <div className="space-y-3">
         <button
           type="submit"
           disabled={isSubmitting}
-          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-            isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
-          }`}
-          data-testid="create-stream-button"
+          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isSubmitting ? 'opacity-75 cursor-not-allowed' : ''}`}
+          data-testid="update-stream-button"
         >
-          {isSubmitting ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Topic Stream' : 'Create Topic Stream')}
+          {isSubmitting ? 'Updating...' : 'Update Topic Stream'}
         </button>
+
+        {isEditing && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Cancel
+          </button>
+        )}
       </div>
     </form>
   );
