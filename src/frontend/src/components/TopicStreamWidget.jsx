@@ -407,41 +407,47 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                 )}
               </div>
             ) : (
-              <div className="flex flex-col items-end space-y-1 relative"> {/* items-end aligns flex items to the right */}
-                {/* First line: Edit, Update Now */}
-                <div className="flex space-x-1"> {/* Container for first line buttons */}
-                  <button
-                    onClick={handleEdit}
-                    className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={handleUpdateNow}
-                    disabled={updating}
-                    className={`text-xs py-1 px-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${
-                      updating ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    {updating ? 'Updating...' : 'Update Now'}
-                  </button>
-                </div>
+              <div className="flex space-x-1 items-center relative flex-shrink-0 justify-end"> {/* Right-aligned row of buttons */}
+                {/* Edit Button for List View - Icon */}
+                <button
+                  onClick={handleEdit}
+                  className="text-xs p-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  title="Edit Stream"
+                >
+                  {/* Pencil Icon */}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                </button>
 
-                {/* Second line: Delete, Export */}
-                <div className="flex space-x-1 justify-end w-full"> {/* Ensure buttons are right-aligned on this line */}
-                  <button
-                    onClick={handleDeleteStream}
-                    className="text-xs py-1 px-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                  >
-                    Delete Stream
-                  </button>
-                  <button
-                    onClick={() => setShowExportOptions(!showExportOptions)}
-                    className="text-xs py-1 px-2 rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors"
-                  >
-                    Export
-                  </button>
-                </div>
+                {/* Update Now Button for List View - Icon */}
+                <button
+                  onClick={handleUpdateNow}
+                  disabled={updating}
+                  className={`text-xs p-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={updating ? 'Updating...' : 'Update Now'}
+                >
+                   {/* Using SVG file from public folder */}
+                   <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
+                </button>
+
+                {/* Delete Button for List View - Icon */}
+                <button
+                  onClick={handleDeleteStream}
+                  className="text-xs p-1 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  title="Delete Stream"
+                >
+                   {/* Using trashcan SVG file from public folder */}
+                   <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
+                </button>
+
+                {/* Export Button for List View - Remains text */}
+                <button
+                  onClick={() => setShowExportOptions(!showExportOptions)}
+                  className="text-xs py-1 px-2 rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors"
+                >
+                  Export
+                </button>
 
                 {/* Export Options Dropdown - positioned relative to the main flex-col container */}
                 {showExportOptions && (
