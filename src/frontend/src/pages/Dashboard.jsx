@@ -347,7 +347,7 @@ const Dashboard = () => {
   const renderSummaryItem = (summary) => (
     <div key={summary.id} className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 mb-4">
       {/* Summary Header - Make this sticky */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-[#2a2a2e] z-10">
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700 sticky top-[69px] bg-white dark:bg-[#2a2a2e] z-10">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 line-clamp-1 max-w-[75%] Camino text-ellipsis overflow-hidden" title={summary.streamQuery}>{summary.streamQuery}</h3>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 font-medium">
@@ -429,7 +429,7 @@ const Dashboard = () => {
   return (
     <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#1c1c1e]' : 'bg-slate-100'}`}>
       {/* Header */}
-      <header className={`shadow-sm border-b ${theme === 'dark' ? 'border-slate-700 bg-[#2a2a2e]' : 'border-slate-200 bg-white'}`}>
+      <header className={`shadow-sm border-b ${theme === 'dark' ? 'border-slate-700 bg-[#2a2a2e]' : 'border-slate-200 bg-white'} sticky top-0 z-20 w-full`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
             className="text-3xl font-bold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
@@ -555,7 +555,7 @@ const Dashboard = () => {
             <div className="grid grid-cols-12 gap-6">
               {/* Sidebar: Conditionally render in DOM based on viewMode to simplify layout management */}
               {viewMode === 'list' && (
-                <div className={`col-span-12 md:col-span-3 rounded-lg shadow-sm ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200 shadow-md'} sticky top-0 h-screen overflow-y-auto`}>
+                <div className={`col-span-12 md:col-span-3 rounded-lg shadow-sm ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200 shadow-md'} sticky top-[69px] h-screen overflow-y-auto`}>
                   <div className={`p-4 border-b ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                     <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
                     <div className="flex space-x-2">
