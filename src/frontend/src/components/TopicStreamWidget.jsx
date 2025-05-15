@@ -118,8 +118,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
   // Calculate time since last update
   const lastUpdateTimestamp = summaries.length > 0 ? summaries[0].created_at : null;
+  
+  // Get user's local time zone
+  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
   const timeSinceLastUpdate = lastUpdateTimestamp 
-    ? formatDistanceToNowStrict(toZonedTime(parseISO(lastUpdateTimestamp), 'America/New_York'), { addSuffix: true })
+    ? formatDistanceToNowStrict(toZonedTime(parseISO(lastUpdateTimestamp), userTimeZone), { addSuffix: true })
     : 'Never updated';
 
   if (showEditForm) {
@@ -145,9 +149,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
   return (
     <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200`}>
-      <div className="p-4 border-b dark:border-gray-700 flex justify-between items-start">
-        <div className="flex-1 min-w-0 mr-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+      <div className={`p-4 border-b dark:border-gray-700 flex ${isGridView ? 'flex-col space-y-4' : 'justify-between items-start'}`}>
+        <div className={`${isGridView ? 'w-full' : 'flex-1 min-w-0 mr-4'}`}>
+          <h3 className={`text-lg font-semibold text-gray-900 dark:text-white ${isGridView ? 'line-clamp-3' : 'truncate'}`}>
             {stream.query}
           </h3>
           <div className="flex flex-wrap gap-2 mt-2">
@@ -166,7 +170,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
           </div>
         </div>
         
-        <div className="flex space-x-1">
+        <div className={`${isGridView ? 'flex flex-wrap gap-2 w-full justify-start' : 'flex space-x-1'}`}>
           <button
             onClick={handleEdit}
             className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
@@ -210,7 +214,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             <div key={summary.id} className="p-4">
               <div className="mb-2 flex justify-between items-center">
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at), 'America/New_York'), 'America/New_York', 'MMM d, yyyy h:mm a') : ''}
+                  {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : ''}
                 </div>
                 <div className="flex space-x-2 items-center">
                    {summary.model && (
@@ -296,7 +300,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               <div className="flex-1 basis-1/2 p-4 border-r dark:border-gray-700 overflow-y-auto">
                 <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Summary</h4>
                 <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  {selectedSummary.created_at ? formatInTimeZone(toZonedTime(parseISO(selectedSummary.created_at), 'America/New_York'), 'America/New_York', 'MMM d, yyyy h:mm a') : ''} • Model: {selectedSummary.model_type}
+                  {selectedSummary.created_at ? formatInTimeZone(toZonedTime(parseISO(selectedSummary.created_at), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : ''} • Model: {selectedSummary.model_type}
                 </div>
                 <MarkdownRenderer content={selectedSummary.content} />
               </div>
