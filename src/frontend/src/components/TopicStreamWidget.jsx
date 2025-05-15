@@ -285,7 +285,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             {/* Buttons - right side, need conditional layout */}
             {isGridView ? (
               // Grid View Layout: All buttons on one line, right-aligned
-              <div className="flex space-x-1 items-center ml-auto relative"> {/* ml-auto pushes buttons to the right */}
+              <div className="flex space-x-1 items-center relative"> {/* Removed ml-auto for left alignment */}
                 {/* Edit Button for Grid View */}
                 <button
                   onClick={handleEdit}
