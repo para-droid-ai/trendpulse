@@ -65,4 +65,90 @@ The frontend communicates with the backend API for:
 - React Router
 - TailwindCSS
 - Axios for API requests
-- Date-fns for date formatting 
+- Date-fns for date formatting
+
+```mermaid
+flowchart TB
+  subgraph Root
+    A[Live_To_do.md]
+    B[README.md]
+    C[.cursor/]
+    D[.venv/]
+    E[docs/]
+    F[src/]
+  end
+
+  subgraph docs
+    G[context.md]
+    H[sonar_API.md]
+    I[sonar_models.md]
+    J[data_model.xml]
+    K[file_structure.xml]
+    L[api_schema.xml]
+    M[testing/]
+  end
+
+  subgraph src
+    N[__init__.py]
+    O[backend/]
+    P[frontend/]
+  end
+
+  subgraph backend
+    O1[app.py]
+    O2[models.py]
+    O3[database.py]
+    O4[perplexity_api.py]
+    O5[scheduler.py]
+    O6[run_server.py]
+    O7[requirements.txt]
+    O8[create_test_user.py]
+    O9[reset_db.py]
+    O10[test_*.py…]
+    O11[utils/]
+  end
+
+  subgraph utils
+    U1[perplexity_api.py]
+    U2[scheduler.js]
+  end
+
+  subgraph frontend
+    P1[package.json]
+    P2[package-lock.json]
+    P3[tailwind.config.js]
+    P4[App.jsx]
+    P5[pages/]
+    P6[src/]
+    P7[components/]
+    P8[services/]
+    P9[context/]
+    P10[public/]
+    P11[build/]
+  end
+
+  subgraph pages
+    L1[Dashboard.jsx]
+    L2[Register.jsx]
+    L3[Login.jsx]
+  end
+
+  subgraph src_front
+    S1[index.js]
+    S2[index.css]
+    S3[markdown.css]
+    S4[pages/]
+    S5[components/]
+    S6[services/]
+    S7[context/]
+  end
+
+  Root --> docs
+  Root --> src
+  src --> backend
+  src --> frontend
+  frontend --> pages
+  frontend --> src_front
+  backend --> utils
+
+``` 

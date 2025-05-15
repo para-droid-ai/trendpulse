@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { topicStreamAPI } from '../services/api';
-import { format } from 'date-fns';
+import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import DeepDiveChat from './DeepDiveChat';
 import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
@@ -15,13 +16,15 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   const [updating, setUpdating] = useState(false);
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
+
+  // State for deleting the WHOLE stream (keep existing)
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
 
-  const fetchSummaries = useCallback(async () => {
-    if (!stream || typeof stream.id === 'undefined') {
-      setLoading(false);
-      return;
-    }
+  useEffect(() => {
+    fetchSummaries();
+  }, [stream.id]);
+
+  const fetchSummaries = async () => {
     try {
       setLoading(true);
       setError('');
@@ -33,19 +36,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     } finally {
       setLoading(false);
     }
-  }, [stream]);
-
-  useEffect(() => {
-    if (stream && typeof stream.id !== 'undefined') {
-      fetchSummaries();
-    }
-  }, [fetchSummaries, stream]);
+  };
 
   const handleUpdateNow = async () => {
-    if (!stream || typeof stream.id === 'undefined') return;
     try {
       setUpdating(true);
       setError('');
+      
       const newSummary = await topicStreamAPI.updateNow(stream.id);
       
       if (newSummary.content && newSummary.content.includes("No new information is available")) {
@@ -66,9 +63,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   };
 
   const confirmDeleteStream = () => {
-    if (stream && typeof stream.id !== 'undefined') {
-      onDelete(stream.id);
-    }
+    onDelete(stream.id);
     setShowDeleteStreamConfirm(false);
   };
 
@@ -95,7 +90,11 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   };
 
   const toggleExpandSummary = (id) => {
-    setExpandedSummaryId(prevId => (prevId === id ? null : id));
+    if (expandedSummaryId === id) {
+      setExpandedSummaryId(null);
+    } else {
+      setExpandedSummaryId(id);
+    }
   };
 
   const handleEdit = () => {
@@ -103,15 +102,10 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   };
 
   const handleEditSubmit = async (formData) => {
-    if (!stream || typeof stream.id === 'undefined' || !onUpdate) {
-      setError('Cannot update stream at this time.');
-      return;
-    }
     try {
       await onUpdate(stream.id, formData);
       setShowEditForm(false);
       setError('');
-      fetchSummaries();
     } catch (err) {
       console.error('Failed to update stream:', err);
       setError(err.message || 'Failed to update stream. Please try again.');
@@ -121,6 +115,16 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   if (!stream) {
     return null;
   }
+
+  // Calculate time since last update
+  const lastUpdateTimestamp = summaries.length > 0 ? summaries[0].created_at : null;
+  
+  // Get user's local time zone
+  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const timeSinceLastUpdate = lastUpdateTimestamp 
+    ? formatDistanceToNowStrict(toZonedTime(parseISO(lastUpdateTimestamp), userTimeZone), { addSuffix: true })
+    : 'Never updated';
 
   if (showEditForm) {
     return (
@@ -145,9 +149,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
   return (
     <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200`}>
-      <div className="p-4 border-b dark:border-gray-700 flex justify-between items-start">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+      <div className={`p-4 border-b dark:border-gray-700 flex ${isGridView ? 'flex-col space-y-4' : 'justify-between items-start'}`}>
+        <div className={`${isGridView ? 'w-full' : 'flex-1 min-w-0 mr-4'}`}>
+          <h3 className={`text-lg font-semibold text-gray-900 dark:text-white ${isGridView ? 'line-clamp-3' : 'truncate'}`}>
             {stream.query}
           </h3>
           <div className="flex flex-wrap gap-2 mt-2">
@@ -160,10 +164,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
               {stream.model_type}
             </span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+              {timeSinceLastUpdate}
+            </span>
           </div>
         </div>
         
-        <div className="flex space-x-1 flex-shrink-0">
+        <div className={`${isGridView ? 'flex flex-wrap gap-2 w-full justify-start' : 'flex space-x-1'}`}>
           <button
             onClick={handleEdit}
             className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
@@ -207,9 +214,14 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             <div key={summary.id} className="p-4">
               <div className="mb-2 flex justify-between items-center">
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {summary.created_at ? format(new Date(summary.created_at), 'MMM d, yyyy h:mm a') : 'Date unavailable'}
+                  {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : ''}
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 items-center">
+                   {summary.model && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      {summary.model}
+                    </span>
+                  )}
                   <button
                     onClick={() => handleDeepDive(summary)}
                     className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
@@ -227,10 +239,10 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               
               <div 
                 className={`prose prose-sm max-w-none dark:prose-invert overflow-hidden ${
-                  expandedSummaryId !== summary.id && 'line-clamp-4'
+                  expandedSummaryId !== summary.id && 'line-clamp-15'
                 }`}
               >
-                <MarkdownRenderer content={summary.content || ''} />
+                <MarkdownRenderer content={summary.content} />
               </div>
               
               {summary.content && summary.content.length > 300 && (
@@ -249,12 +261,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     {summary.sources.map((source, index) => (
                       <a
                         key={index}
-                        href={source.url || source}
+                        href={source}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900 px-2 py-1 rounded-full truncate max-w-[200px]"
-                        title={source.url || source}>
-                        {source.name || source.url || source}
+                      >
+                        {source}
                       </a>
                     ))}
                   </div>
@@ -267,9 +279,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
       {showDeepDive && selectedSummary && (
         <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[95vw] h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-3/4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300 truncate flex-1 min-w-0">
                 Deep Dive: {stream.query}
               </h3>
               <button
@@ -282,34 +294,19 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               </button>
             </div>
             
-            <div className="flex flex-1 overflow-hidden">
-              <div className="w-1/2 h-full flex flex-col border-r dark:border-gray-700">
-                <h4 className="p-4 border-b text-md font-medium text-gray-700 dark:text-gray-300 sticky top-0 bg-white dark:bg-gray-800 z-10">Original Summary</h4>
-                <div className="flex-1 overflow-y-scroll p-4 bg-white dark:bg-gray-800">
-                  <MarkdownRenderer content={selectedSummary.content || ''} />
-                  {selectedSummary.sources && selectedSummary.sources.length > 0 && (
-                    <div className="mt-4">
-                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
-                      <div className="flex flex-wrap gap-1">
-                        {selectedSummary.sources.map((source, index) => (
-                          <a 
-                            key={index} 
-                            href={typeof source === 'string' ? source : source.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900 px-2 py-1 rounded-full truncate max-w-[200px]" 
-                            title={typeof source === 'string' ? source : source.url}
-                          >
-                            {typeof source === 'string' ? source : (source.name || source.url)}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+            {/* Main content area with two columns */}
+            <div className="flex flex-1 overflow-hidden flex-row">
+              {/* Original Summary Section - Left Column */}
+              <div className="flex-1 basis-1/2 p-4 border-r dark:border-gray-700 overflow-y-auto">
+                <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Summary</h4>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  {selectedSummary.created_at ? formatInTimeZone(toZonedTime(parseISO(selectedSummary.created_at), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : ''} • Model: {selectedSummary.model_type}
                 </div>
+                <MarkdownRenderer content={selectedSummary.content} />
               </div>
               
-              <div className="w-1/2 h-full overflow-hidden">
+              {/* Deep Dive Chat Section - Right Column */}
+              <div className="flex-1 basis-1/2 overflow-hidden">
                 <DeepDiveChat 
                   topicStreamId={stream.id} 
                   summaryId={selectedSummary.id}
@@ -352,4 +349,4 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   );
 };
 
-export default TopicStreamWidget; 
+export default TopicStreamWidget;

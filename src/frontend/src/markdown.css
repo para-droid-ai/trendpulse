@@ -1,5 +1,59 @@
 /* Markdown-specific styles */
 
+/* Override Tailwind Typography prose classes for better heading sizes */
+/* Target headings within the prose-sm class, which is used in TopicStreamWidget */
+
+/* Override h1 size and spacing */
+.prose-sm :where(h1) {
+  font-size: 1.5rem; /* Sets H1 to text-2xl size */
+  line-height: 1.3; /* Adjust line height for better readability */
+  margin-top: 1rem; /* Reduce top margin */
+  margin-bottom: 0.5rem; /* Reduce bottom margin */
+  font-weight: 600; /* semibold instead of bold */
+}
+
+/* Override h2 size and spacing - Often summaries use H2 for subheadings */
+.prose-sm :where(h2) {
+  font-size: 1.25rem; /* Sets H2 to text-xl size */
+  line-height: 1.4;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+/* Override h3 size and spacing */
+.prose-sm :where(h3) {
+  font-size: 1.125rem; /* Sets H3 to text-lg size */
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+/* Also adjust for larger screen sizes */
+.prose-lg :where(h1),
+.prose-xl :where(h1) {
+  font-size: 1.75rem;
+  line-height: 1.3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.prose-lg :where(h2),
+.prose-xl :where(h2) {
+  font-size: 1.5rem;
+  line-height: 1.4;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose-lg :where(h3),
+.prose-xl :where(h3) {
+  font-size: 1.25rem;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Original markdown-content styles */
 .markdown-content {
   @apply text-gray-800 leading-relaxed;
 }

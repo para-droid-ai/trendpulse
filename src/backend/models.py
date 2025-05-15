@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from enum import Enum
@@ -19,6 +19,8 @@ class ModelType(str, Enum):
     SONAR_PRO = "sonar-pro"
     SONAR_REASONING = "sonar-reasoning"
     SONAR_REASONING_PRO = "sonar-reasoning-pro"
+    SONAR_DEEP_RESEARCH = "sonar-deep-research"
+    R1_1776 = "r1-1776"
 
 class User(Base):
     __tablename__ = "users"
@@ -39,6 +41,7 @@ class TopicStream(Base):
     model_type = Column(SQLEnum(ModelType))
     recency_filter = Column(String)
     last_updated = Column(DateTime, default=datetime.utcnow)
+    system_prompt = Column(Text, nullable=True)  # Custom prompt for this stream
 
     user = relationship("User", back_populates="topic_streams")
     summaries = relationship("Summary", back_populates="topic_stream")
@@ -51,5 +54,6 @@ class Summary(Base):
     content = Column(String)
     sources = Column(String)  # Store as JSON string
     created_at = Column(DateTime, default=datetime.utcnow)
+    model = Column(String, nullable=True)  # Store model used for this summary
 
     topic_stream = relationship("TopicStream", back_populates="summaries")

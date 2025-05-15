@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime, timedelta
 from typing import List, Optional
+from enum import Enum
 import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
@@ -34,6 +35,7 @@ from models import Base, User, TopicStream, Summary, UpdateFrequency, DetailLeve
 # from scheduler import TopicStreamScheduler
 from perplexity_api import PerplexityAPI
 from database import SessionLocal, engine
+import models  # Add missing models import
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -52,15 +54,13 @@ app = FastAPI(title="TrendPulse Dashboard API")
 
 # Configure CORS
 origins = [
-    "http://localhost:3000",  # React frontend default port
-    "http://127.0.0.1:3000",
-    "*",  # Allow any origin during development
-    # Add production URLs as needed
+    "http://localhost:3000",
+    "http://127.0.0.1:3000"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow any origin during development
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,6 +81,7 @@ class TopicStreamCreate(BaseModel):
     detail_level: str     # Will be converted to DetailLevel
     model_type: str       # Will be converted to ModelType
     recency_filter: str
+    system_prompt: Optional[str] = None
 
 class TopicStreamResponse(BaseModel):
     id: int
@@ -90,15 +91,55 @@ class TopicStreamResponse(BaseModel):
     model_type: str
     recency_filter: str
     last_updated: Optional[datetime]
+    system_prompt: Optional[str] = None
+    
+    class Config:
+        orm_mode = True
+        from_attributes = True
+        
+        @classmethod
+        def schema_extra(cls, schema, model):
+            for prop in schema.get('properties', {}).values():
+                if prop.get('type') == 'string' and prop.get('format') == 'date-time':
+                    prop['format'] = 'date-time'
+                    
+        json_encoders = {
+            Enum: lambda v: v.value if isinstance(v, Enum) else v
+        }
 
 class SummaryResponse(BaseModel):
     id: int
     content: str
     sources: List[str]
     created_at: datetime
+    model: str = ""
 
 class SummaryCreate(BaseModel):
     content: str
+
+class DeepDiveRequest(BaseModel):
+    topic_stream_id: int
+    summary_id: int
+    question: str
+    model: Optional[str] = None
+
+class DeepDiveResponse(BaseModel):
+    answer: str
+    sources: List[str]
+    model: str
+
+# Helper function to convert model objects to dict with proper enum handling
+def model_to_dict(obj):
+    if hasattr(obj, "__table__"):
+        result = {}
+        for key in obj.__table__.columns.keys():
+            value = getattr(obj, key)
+            if isinstance(value, Enum):
+                result[key] = value.value
+            else:
+                result[key] = value
+        return result
+    return obj
 
 # Database dependency
 def get_db():
@@ -186,32 +227,47 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
         # Use the model type from the topic stream
         model = topic_stream.model_type.value
         logger.debug(f"Using model from topic stream: {model}")
-        
-        # Modify query based on detail level and whether this is an update
-        query_prefix = ""
-        if topic_stream.detail_level == DetailLevel.BRIEF:
-            query_prefix = "Give a brief summary of "
-        elif topic_stream.detail_level == DetailLevel.DETAILED:
-            query_prefix = "Give a detailed analysis of "
-        
-        full_query = f"{query_prefix}{topic_stream.query}"
-        
-        # If this is an update (not the first summary), specifically ask for new information
-        if prev_summary_content:
-            full_query = f"Provide ONLY NEW information about {topic_stream.query} that wasn't in the previous summary. Focus on recent developments, news, and updates."
-        
-        if topic_stream.recency_filter != "all_time":
-            full_query += f" focusing on information from {topic_stream.recency_filter}"
-        
-        # Add instruction to format in markdown
-        full_query += ". Format your response using markdown for better readability."
-        
-        # If this is an update, add instruction to avoid repeating information
-        if prev_summary_content:
-            full_query += " DO NOT repeat information that was already covered previously."
+
+        # Use custom system prompt if provided
+        if hasattr(topic_stream, 'system_prompt') and topic_stream.system_prompt:
+            full_query = topic_stream.system_prompt
+        else:
+            # Modify query based on detail level and whether this is an update
+            query_prefix = ""
+            if topic_stream.detail_level == DetailLevel.BRIEF:
+                query_prefix = "Give a brief summary of "
+            elif topic_stream.detail_level == DetailLevel.DETAILED:
+                query_prefix = "Give a detailed analysis of "
+
+            full_query = f"{query_prefix}{topic_stream.query}"
+
+            # If this is an update (not the first summary), specifically ask for new information
+            if prev_summary_content:
+                full_query = f"Provide ONLY NEW information about {topic_stream.query} that wasn't in the previous summary. Focus on recent developments, news, and updates."
+
+            if topic_stream.recency_filter != "all_time":
+                full_query += f" focusing on information from {topic_stream.recency_filter}"
+
+            # Add instruction to format in markdown
+            full_query += ". Format your response using markdown for better readability."
+
+            # If this is an update, add instruction to avoid repeating information
+            if prev_summary_content:
+                full_query += " DO NOT repeat information that was already covered previously."
         
         logger.debug(f"Sending query to Perplexity API: {full_query}")
         
+        # Determine max_tokens based on detail_level
+        if topic_stream.detail_level == DetailLevel.COMPREHENSIVE or topic_stream.detail_level == DetailLevel.DETAILED:
+            max_tokens_for_api = 8000
+            logger.debug(f"Using max_tokens: {max_tokens_for_api} for DETAILED/COMPREHENSIVE level")
+        elif topic_stream.detail_level == DetailLevel.BRIEF:
+            max_tokens_for_api = 1500 
+            logger.debug(f"Using max_tokens: {max_tokens_for_api} for BRIEF level")
+        else: # Default fallback, though ideally all cases are handled
+            max_tokens_for_api = 1000
+            logger.debug(f"Using default max_tokens: {max_tokens_for_api}")
+
         # API call with detailed error handling
         try:
             result = await perplexity_api.search_perplexity(
@@ -220,7 +276,7 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
                 recency_filter=topic_stream.recency_filter,
                 previous_summary=prev_summary_content,  # Pass the previous summary for context
                 temperature=0.2,
-                max_tokens=1000
+                max_tokens=max_tokens_for_api # Use dynamic max_tokens
             )
             logger.debug(f"API call successful, received response of {len(str(result))} characters")
         except Exception as api_error:
@@ -253,7 +309,8 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
                 topic_stream_id=topic_stream.id,
                 content=content,
                 sources=sources_json,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
+                model=model  # Save the model used for this summary
             )
             
             # Update topic stream's last_updated
@@ -370,7 +427,8 @@ async def create_topic_stream(
             update_frequency=update_freq,
             detail_level=detail_lvl,
             model_type=model,
-            recency_filter=topic_stream.recency_filter
+            recency_filter=topic_stream.recency_filter,
+            system_prompt=topic_stream.system_prompt
         )
         
         logger.debug("Created TopicStream object")
@@ -406,6 +464,15 @@ async def create_topic_stream(
             detail=f"Error creating topic stream: {str(e)}"
         )
 
+@app.get("/topic-streams/")
+async def get_topic_streams(db: Session = Depends(get_db)):
+    try:
+        streams = db.query(models.TopicStream).all()
+        return streams
+    except Exception as e:
+        logger.error(f"Error fetching topic streams: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching streams")
+
 @app.get("/topic-streams/", response_model=List[TopicStreamResponse])
 def get_topic_streams(
     current_user: User = Depends(get_current_user),
@@ -417,11 +484,14 @@ def get_topic_streams(
         streams = db.query(TopicStream).filter(TopicStream.user_id == current_user.id).all()
         logger.debug(f"Found {len(streams)} topic streams for user {current_user.id}")
         
-        # Log each stream for debugging
+        # Convert model objects to dicts with proper enum handling
+        result = []
         for stream in streams:
-            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream.model_type}")
+            stream_dict = model_to_dict(stream)
+            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream_dict['model_type']}")
+            result.append(stream_dict)
             
-        return streams
+        return result
     except Exception as e:
         logger.error(f"Error fetching topic streams for user {current_user.id}: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -437,6 +507,9 @@ def get_topic_stream_summaries(
 ):
     try:
         logger.debug(f"Fetching summaries for topic stream ID: {topic_stream_id}")
+        
+        # Log before querying for topic stream
+        logger.debug(f"Querying for topic stream ID: {topic_stream_id} and user ID: {current_user.id}")
         topic_stream = db.query(TopicStream).filter(
             TopicStream.id == topic_stream_id,
             TopicStream.user_id == current_user.id
@@ -446,6 +519,8 @@ def get_topic_stream_summaries(
             logger.warning(f"Topic stream {topic_stream_id} not found for user {current_user.id}")
             raise HTTPException(status_code=404, detail="Topic stream not found")
         
+        # Log before querying for summaries
+        logger.debug(f"Querying for summaries for topic stream ID: {topic_stream_id}")
         summaries_db = db.query(Summary).filter(Summary.topic_stream_id == topic_stream_id).order_by(Summary.created_at.desc()).all()
         logger.debug(f"Found {len(summaries_db)} summaries for topic stream {topic_stream_id}")
         
@@ -453,6 +528,8 @@ def get_topic_stream_summaries(
         response_summaries = []
         for summary in summaries_db:
             parsed_sources = []
+            # Log before processing sources
+            logger.debug(f"Processing sources for summary ID: {summary.id}")
             if summary.sources: # Check if sources string is not None or empty
                 try:
                     # First ensure it's a string - it might already be parsed in some cases
@@ -469,21 +546,31 @@ def get_topic_stream_summaries(
                 except json.JSONDecodeError:
                     logger.warning(f"Failed to decode sources JSON for summary {summary.id}: {summary.sources}")
                     parsed_sources = [] # Default to empty list on error
-            
-            logger.debug(f"Processed summary {summary.id} with {len(parsed_sources)} sources")
+                except Exception as source_parse_error:
+                    # Catch any other errors during source parsing
+                    logger.error(f"Unexpected error parsing sources for summary {summary.id}: {str(source_parse_error)}", exc_info=True)
+                    parsed_sources = []
+
+            # Log before appending summary to response
+            logger.debug(f"Appending summary ID: {summary.id} to response")
             response_summaries.append(
                 SummaryResponse(
                     id=summary.id,
                     content=summary.content,
                     sources=parsed_sources, # Use the parsed list
-                    created_at=summary.created_at
+                    created_at=summary.created_at,
+                    model=summary.model if summary.model is not None else ""
                 )
             )
         
         return response_summaries # Return the manually constructed list
+    except HTTPException as http_exc: 
+        # Re-raise HTTPException to preserve status code and details
+        raise http_exc
     except Exception as e:
         logger.error(f"Error fetching summaries: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error fetching summaries: {str(e)}")
+        # Re-raise as HTTPException to return to the frontend
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while fetching summaries: {str(e)}")
 
 @app.delete("/topic-streams/{topic_stream_id}")
 def delete_topic_stream(
@@ -555,7 +642,8 @@ async def update_topic_stream_now(
                 id=summary.id,
                 content=summary.content,
                 sources=parsed_sources,
-                created_at=summary.created_at
+                created_at=summary.created_at,
+                model=summary.model if summary.model is not None else ""
             )
         except Exception as e:
             logger.error(f"Error during search and summary creation: {str(e)}", exc_info=True)
@@ -569,67 +657,55 @@ async def update_topic_stream_now(
             detail=f"Error updating topic stream: {str(e)}"
         )
 
-class DeepDiveRequest(BaseModel):
-    topic_stream_id: int
-    summary_id: int
-    question: str
-
-class DeepDiveResponse(BaseModel):
-    answer: str
-    sources: List[str]
-    model: str  # Add model to the response
-
 @app.post("/deep-dive/", response_model=DeepDiveResponse)
 async def deep_dive(
     request: DeepDiveRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Verify topic stream exists and belongs to current user
     topic_stream = db.query(TopicStream).filter(
         TopicStream.id == request.topic_stream_id,
         TopicStream.user_id == current_user.id
     ).first()
     if not topic_stream:
-        raise HTTPException(status_code=404, detail="Topic stream not found")
-    
-    # Verify summary exists and belongs to the topic stream
+        raise HTTPException(status_code=404, detail="Topic stream not found or not owned by user")
+
     summary = db.query(Summary).filter(
         Summary.id == request.summary_id,
         Summary.topic_stream_id == request.topic_stream_id
     ).first()
     if not summary:
         raise HTTPException(status_code=404, detail="Summary not found")
+
+    perplexity_api = PerplexityAPI()
     
+    contextual_question = (
+        f"Regarding the topic \"{topic_stream.query}\" and the following summary:\n\n"
+        f"Summary: {summary.content}\n\n"
+        f"User question: {request.question}"
+    )
+
+    model_to_use = request.model if request.model else "sonar-reasoning"
+    logger.debug(f"Deep dive for topic '{topic_stream.query}', summary ID: {request.summary_id}. Question: '{request.question}'")
+    logger.info(f"Deep Dive - Using model: {model_to_use}") # Changed to INFO for easier spotting
+
     try:
-        # Initialize the Perplexity API
-        perplexity_api = PerplexityAPI()
-        
-        # Use sonar-reasoning model for follow-up questions as it's best for this task
-        model = "sonar-reasoning"
-        
-        # Get the answer and sources
-        context = f"Based on the following summary about '{topic_stream.query}':\n\n{summary.content}"
-        result = await perplexity_api.ask_follow_up_question(
-            query=request.question,
-            context=context,
-            model=model
+        # *** THIS IS THE CRITICAL PART - Ensure it calls search_perplexity ***
+        result = await perplexity_api.search_perplexity(
+            query=contextual_question, 
+            model=model_to_use, 
+            recency_filter="all_time",
+            temperature=0.2, 
+            max_tokens=1000 # Using 1000 as per previous attempt, can be adjusted
         )
-        
-        # Keep the original answer including <think> tags
-        answer = result.get("answer", "No answer available")
-        
-        return {
-            "answer": answer,
-            "sources": result.get("sources", []),
-            "model": model  # Return the model used
-        }
     except Exception as e:
-        logger.error(f"Error in deep dive: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing deep dive request: {str(e)}"
-        )
+        logger.error(f"Error during Perplexity API call in deep_dive: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error communicating with Perplexity API: {str(e)}")
+
+    answer = result.get("answer", "Could not retrieve an answer.")
+    sources_list = result.get("sources", [])
+    
+    return DeepDiveResponse(answer=answer, sources=sources_list, model=model_to_use)
 
 @app.post("/topic-streams/{topic_stream_id}/summaries/", response_model=SummaryResponse)
 def append_summary(
@@ -645,10 +721,12 @@ def append_summary(
     if not topic_stream:
         raise HTTPException(status_code=404, detail="Topic stream not found")
     import json
+    # Try to use the current model_type from the topic stream for the summary
     new_summary = Summary(
         topic_stream_id=topic_stream_id,
         content=summary_create.content,
-        sources=json.dumps([])
+        sources=json.dumps([]),
+        model=str(topic_stream.model_type) if hasattr(topic_stream, 'model_type') and topic_stream.model_type else None
     )
     db.add(new_summary)
     db.commit()
@@ -659,7 +737,8 @@ def append_summary(
         id=new_summary.id,
         content=new_summary.content,
         sources=parsed_sources,
-        created_at=new_summary.created_at
+        created_at=new_summary.created_at,
+        model=new_summary.model
     )
 
 @app.delete("/topic-streams/{topic_stream_id}/summaries/{summary_id}")
@@ -744,10 +823,23 @@ async def update_topic_stream(
             logger.warning(f"Topic stream {topic_stream_id} not found for user {current_user.id}")
             raise HTTPException(status_code=404, detail="Topic stream not found")
         
-        # Convert enum values
-        update_freq = UpdateFrequency(topic_stream.update_frequency)
-        detail_lvl = DetailLevel(topic_stream.detail_level)
-        model = ModelType(topic_stream.model_type)
+        # Convert enum values safely
+        try:
+            update_freq = UpdateFrequency(topic_stream.update_frequency)
+            detail_lvl = DetailLevel(topic_stream.detail_level)
+            
+            # Special handling for model_type to ensure r1-1776 works
+            if topic_stream.model_type == "r1-1776":
+                model = ModelType.R1_1776
+            else:
+                model = ModelType(topic_stream.model_type)
+                
+        except ValueError as e:
+            logger.error(f"Invalid enum value: {str(e)}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid enum value: {str(e)}"
+            )
         
         # Update the topic stream
         db_topic_stream.query = topic_stream.query
@@ -755,6 +847,7 @@ async def update_topic_stream(
         db_topic_stream.detail_level = detail_lvl
         db_topic_stream.model_type = model
         db_topic_stream.recency_filter = topic_stream.recency_filter
+        db_topic_stream.system_prompt = topic_stream.system_prompt
         
         db.commit()
         db.refresh(db_topic_stream)

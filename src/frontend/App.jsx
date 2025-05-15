@@ -9,7 +9,13 @@ import AuthContext from './context/AuthContext';
 function App() {
   const [user, setUser] = useState(localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null);
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-  const [darkMode, setDarkMode] = useState(localStorage.getItem('darkMode') === 'true');
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Force light mode on initial load
+  useEffect(() => {
+    localStorage.setItem('darkMode', 'false');
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   // Apply dark mode to the document when darkMode state changes
   useEffect(() => {

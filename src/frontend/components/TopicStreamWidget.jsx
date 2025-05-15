@@ -7,6 +7,8 @@ import SummaryDeleteButton from '../src/components/SummaryDeleteButton';
 import TopicStreamForm from './TopicStreamForm';
 
 const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
+  // Debug: Log the received stream prop
+  console.log('TopicStreamWidget stream:', stream);
   const [summaries, setSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -139,21 +141,28 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   return (
     <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200`}>
       <div className="p-4 border-b dark:border-gray-700 flex justify-between items-start">
-        <div>
+        <div className="w-full">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
             {stream.query}
           </h3>
           <div className="flex flex-wrap gap-2 mt-2">
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-              {stream.update_frequency}
+              {stream.update_frequency || 'N/A'}
             </span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-              {stream.detail_level}
+              {stream.detail_level || 'N/A'}
             </span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-              {stream.model_type}
+              {stream.model_type || 'N/A'}
             </span>
           </div>
+          {/* Warning if any tag is missing */}
+          {(!stream.update_frequency || !stream.detail_level || !stream.model_type) && (
+            <div className="mt-1 text-xs text-yellow-700 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200 rounded px-2 py-1 inline-block">
+              Warning: Some stream metadata is missing.
+            </div>
+          )}
+        </div>
         </div>
         
         <div className="flex space-x-1">

@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AuthContext from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 function App() {
   const [user, setUser] = useState(localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null);
@@ -24,15 +25,17 @@ function App() {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
-      <Router>
-        <Routes>
-          <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
-          <Route path="/register" element={isAuthenticated ? <Navigate to="/" /> : <Register />} />
-          <Route path="/" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
-        </Routes>
-      </Router>
-    </AuthContext.Provider>
+    <ThemeProvider>
+      <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
+        <Router>
+          <Routes>
+            <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
+            <Route path="/register" element={isAuthenticated ? <Navigate to="/" /> : <Register />} />
+            <Route path="/" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
+          </Routes>
+        </Router>
+      </AuthContext.Provider>
+    </ThemeProvider>
   );
 }
 

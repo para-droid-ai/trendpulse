@@ -2,12 +2,35 @@ import React, { useState, useEffect, useRef } from 'react';
 import { deepDiveAPI, topicStreamAPI } from '../services/api';
 import MarkdownRenderer from './MarkdownRenderer';
 
+// Helper function to format R1-1776 model responses for better readability
+const formatR1Response = (text) => {
+  if (!text) return '';
+  
+  // Add proper line breaks for paragraphs
+  let formatted = text
+    // Split on sentences to create more readable paragraphs
+    .replace(/\. /g, '.\n\n')
+    // Fix any excessive line breaks
+    .replace(/\n{3,}/g, '\n\n')
+    // Add markdown headers for better structure
+    .replace(/([A-Z][A-Za-z\s]{10,}:)/g, '\n## $1');
+  
+  // Add a markdown header at the beginning if none exists
+  if (!formatted.startsWith('#')) {
+    formatted = '## Summary\n\n' + formatted;
+  }
+  
+  return formatted;
+};
+
 const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [appendingId, setAppendingId] = useState(null);
+  const [selectedModel, setSelectedModel] = useState('sonar-reasoning'); // Default model
+  const [withContext, setWithContext] = useState(true);
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
@@ -40,8 +63,33 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await deepDiveAPI.askQuestion(topicStreamId, summaryId, question);
-      const aiMsg = { id: Date.now()+1, type: 'ai', content: response.answer, sources: response.sources || [], model: response.model };
+      // Only send previous messages if withContext is true
+      let contextMessages = withContext ? messages : [];
+      const response = await deepDiveAPI.askQuestion(
+        topicStreamId,
+        summaryId,
+        question,
+        selectedModel,
+        { withContext, contextMessages }
+      );
+      
+      // Format the response content based on the model type
+      let formattedContent = response.answer;
+      
+      // Special handling for R1-1776 model responses
+      if (selectedModel === 'r1-1776') {
+        // Split long paragraphs into proper markdown paragraphs
+        formattedContent = formatR1Response(response.answer);
+      }
+      
+      const aiMsg = { 
+        id: Date.now()+1, 
+        type: 'ai', 
+        content: formattedContent, 
+        sources: response.sources || [], 
+        model: response.model 
+      };
+      
       setMessages(prev => [...prev, aiMsg]);
     } catch (err) {
       console.error('Failed to get answer:', err);
@@ -79,7 +127,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
     <div className="flex flex-col h-full">
       <div className="p-3 border-b dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300">Follow-up Questions</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Follow-up Questions</h3>
           <p className="text-xs text-gray-500 dark:text-gray-200">Ask questions to explore this topic further</p>
         </div>
         {messages.length > 0 && (
@@ -112,27 +160,43 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
               
               {message.type==='user'
                 ? <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 text-sm">{message.content}</div>
-                : <div className="text-sm"><MarkdownRenderer content={message.content} /></div>
-              }
-              
-              {message.type==='ai' && message.sources && message.sources.length > 0 && (
-                <div className="mt-2">
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
-                  <div className="flex flex-wrap gap-1">
-                    {message.sources.map((src,i)=>(
-                      <a 
-                        key={i} 
-                        href={src} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-700 px-2 py-1 rounded-full truncate max-w-[200px]"
+                : (
+                  <div className="text-sm">
+                    {/* Summary Content with Read More */}
+                    <div className={`prose prose-sm max-w-none dark:prose-invert overflow-hidden ${!message.isExpanded ? 'line-clamp-10' : ''}`}>
+                      <MarkdownRenderer content={message.content} />
+                    </div>
+                    {message.content && message.content.length > 500 && (
+                      <button
+                        onClick={() => setMessages(prev => prev.map(msg => msg.id === message.id ? { ...msg, isExpanded: !msg.isExpanded } : msg))}
+                        className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
                       >
-                        {src}
-                      </a>
-                    ))}
+                        {message.isExpanded ? 'Read less' : 'Read more'}
+                      </button>
+                    )}
+
+                    {/* Summary Sources - Moved below summary content */}
+                    {message.sources && message.sources.length > 0 && message.model !== 'r1-1776' && (
+                      <div className="mt-4">
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {message.sources.map((src,i)=>(
+                            <a 
+                              key={i} 
+                              href={src} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-700 px-2 py-1 rounded-full truncate max-w-[200px]" 
+                            >
+                              {src}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                )
+              }
               
               {message.type === 'ai' && (
                 <div className="mt-2 flex justify-end">
@@ -172,22 +236,55 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
       </div>
 
       <div className="p-3 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
-        <form onSubmit={handleSubmit} className="flex">
-          <input 
-            type="text" 
-            value={question} 
-            onChange={e=>setQuestion(e.target.value)} 
-            placeholder="Ask a follow-up question..." 
-            className="flex-1 border rounded-l-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400" 
-            disabled={loading} 
-          />
-          <button 
-            type="submit" 
-            className={`bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-r-md ${loading?'opacity-75 cursor-not-allowed':''}`} 
-            disabled={loading}
-          >
-            Send
-          </button>
+        <form onSubmit={handleSubmit} className="space-y-2">
+          <div className="flex">
+            <input 
+              type="text" 
+              value={question} 
+              onChange={e=>setQuestion(e.target.value)} 
+              placeholder="Ask a follow-up question..." 
+              className="flex-1 border rounded-l-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400" 
+              disabled={loading} 
+            />
+            <button 
+              type="submit" 
+              className={`bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-r-md ${loading?'opacity-75 cursor-not-allowed':''}`} 
+              disabled={loading}
+            >
+              Send
+            </button>
+          </div>
+          <div className="flex items-center justify-end space-x-2">
+            <label htmlFor="model-select" className="text-xs text-gray-600 dark:text-gray-400">Model:</label>
+            <select 
+              id="model-select"
+              value={selectedModel}
+              onChange={e => setSelectedModel(e.target.value)}
+              disabled={loading}
+              className="text-xs border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 py-1 pl-2 pr-7"
+            >
+              <option value="sonar-reasoning">Sonar Reasoning (Default)</option>
+              <option value="sonar">Sonar</option>
+              <option value="sonar-pro">Sonar Pro</option>
+              <option value="sonar-reasoning-pro">Sonar Reasoning Pro</option>
+              <option value="sonar-deep-research">Sonar Deep Research</option>
+              <option value="r1-1776">R1-1776 (Offline)</option>
+            </select>
+          </div>
+          <div className="flex items-center mt-2">
+            <input
+              id="with-context-checkbox"
+              type="checkbox"
+              checked={withContext}
+              onChange={e => setWithContext(e.target.checked)}
+              className="mr-2"
+              disabled={loading}
+            />
+            <label htmlFor="with-context-checkbox" className="text-xs text-gray-600 dark:text-gray-400 select-none">
+              Send previous chat context
+              <span className="ml-1 text-gray-400" title="If unchecked, only your current question will be sent to the model. Previous chat history will be omitted.">(?)</span>
+            </label>
+          </div>
         </form>
       </div>
     </div>

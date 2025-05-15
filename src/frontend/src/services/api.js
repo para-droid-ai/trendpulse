@@ -2,11 +2,12 @@ import axios from 'axios';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000',
+  baseURL: 'http://localhost:8000',
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 60000, // Increase to 60 seconds to allow for longer API calls
+  timeout: 2700000, // Increased to 45 minutes (2,700,000 ms)
 });
 
 // Add request interceptor for adding auth token
@@ -222,13 +223,14 @@ export const topicStreamAPI = {
 
 // Deep Dive API calls
 export const deepDiveAPI = {
-  askQuestion: async (topicStreamId, summaryId, question) => {
+  askQuestion: async (topicStreamId, summaryId, question, model) => {
     try {
-      console.log(`Sending deep dive question for topic ${topicStreamId}, summary ${summaryId}: "${question}"`);
+      console.log(`Sending deep dive question for topic ${topicStreamId}, summary ${summaryId}: "${question}", Model: ${model}`);
       const response = await api.post('/deep-dive/', {
         topic_stream_id: topicStreamId,
         summary_id: summaryId,
-        question: question
+        question: question,
+        model: model
       });
       console.log('Deep dive response received');
       return {
