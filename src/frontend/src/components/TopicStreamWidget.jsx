@@ -514,15 +514,17 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     <div className="flex space-x-2 items-center ml-auto"> {/* Added ml-auto to push to the right */}
                        <button
                         onClick={() => handleDeepDive(summary)}
-                        className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
+                        className="text-xs p-1 rounded-md bg-cyan-500 text-white hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 transition-colors"
+                        title="Deep Dive Chat"
                       >
-                        Deep Dive Chat
+                        <img src="/deepdivechat.svg" alt="Deep Dive Chat" className="h-6 w-6" />
                       </button>
                        <SummaryDeleteButton
                         streamId={stream.id}
                         summaryId={summary.id}
                         onSummaryDeleted={handleSummarySuccessfullyDeleted}
                         onError={handleSummaryDeletionError}
+                        isIconOnly={true}
                       />
                     </div>
                   </div>
