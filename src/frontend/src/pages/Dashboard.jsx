@@ -557,16 +557,9 @@ const Dashboard = () => {
               {viewMode === 'list' && (
                 <div className={`col-span-12 md:col-span-3 rounded-lg shadow-sm ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200 shadow-md'} sticky top-[69px] h-screen overflow-y-auto`}>
                   <div className={`p-4 border-b ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
-                    <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
-                    <div className="flex space-x-2">
-                      {!loading && topicStreams.length > 0 && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 italic flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                          </svg>
-                          Drag to reorder
-                        </div>
-                      )}
+                    {/* Header Row */}
+                    <div className="flex justify-between items-center mb-2">
+                      <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
                       <button
                         onClick={() => setShowForm(true)}
                         className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 px-3 py-1 rounded text-sm border border-slate-300 dark:border-slate-600"
@@ -575,6 +568,16 @@ const Dashboard = () => {
                         New Stream
                       </button>
                     </div>
+                    
+                    {/* Drag to reorder text below header row */}
+                    {!loading && topicStreams.length > 0 && (
+                      <div className="text-xs text-slate-500 dark:text-slate-400 italic flex items-center mt-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                        Drag to reorder
+                      </div>
+                    )}
                   </div>
                   
                   {loading ? (

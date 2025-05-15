@@ -438,54 +438,57 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               summaries.map((summary) => (
                 <div key={summary.id} className="p-4">
                   <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Summary</h4>
-                   <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 font-medium">
-                        {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
-                      </span>
-                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{summary.model_type}</span>
-                   </div>
-                   <div className={`prose prose-sm max-w-none dark:prose-invert`}>
-                     <MarkdownRenderer content={summary.content} />
-                   </div>
-                   
-                   {/* Summary Actions */}
-                   <div className="flex space-x-2 mt-4">
-                      <button
-                       onClick={() => handleDeepDive(summary)}
-                       className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
-                     >
-                       Deep Dive
-                     </button>
-                      <SummaryDeleteButton 
-                       streamId={stream.id} 
-                       summaryId={summary.id}
-                       onSummaryDeleted={handleSummarySuccessfullyDeleted}
-                       onError={handleSummaryDeletionError} 
-                     />
-                   </div>
-                  
-                   {/* Summary Sources */}
-                   {summary.sources && summary.sources.length > 0 && (
-                     <div className="mt-3">
-                       <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
-                       <div className="flex flex-wrap gap-1">
-                         {summary.sources.map((source, index) => (
-                           <a
-                             key={index}
-                             href={typeof source === 'string' ? source : (source.url || source.name || source)}
-                             target="_blank"
-                             rel="noopener noreferrer"
-                             className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
-                             title={typeof source === 'string' ? source : (source.url || source.name || source)}
-                           >
-                             {typeof source === 'string' 
-                               ? source 
-                               : (source.name || source.url || source)}
-                           </a>
-                         ))}
-                       </div>
-                     </div>
-                   )}
+                  {/* Timestamp, Model, and Summary Actions */}
+                  <div className="flex flex-wrap gap-2 items-center mb-2">
+                    {/* Timestamp Badge */}
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 font-medium">
+                      {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
+                    </span>
+                    {/* Model Badge */}
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{summary.model_type}</span>
+
+                    {/* Summary Actions - Deep Dive and Delete */}
+                    <div className="flex space-x-2 items-center ml-auto"> {/* Added ml-auto to push buttons to the right */}
+                       <button
+                        onClick={() => handleDeepDive(summary)}
+                        className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
+                      >
+                        Deep Dive
+                      </button>
+                       <SummaryDeleteButton
+                        streamId={stream.id}
+                        summaryId={summary.id}
+                        onSummaryDeleted={handleSummarySuccessfullyDeleted}
+                        onError={handleSummaryDeletionError}
+                      />
+                    </div>
+                  </div>
+                  <div className={`prose prose-sm max-w-none dark:prose-invert`}>
+                    <MarkdownRenderer content={summary.content} />
+                  </div>
+
+                  {/* Summary Sources */}
+                  {summary.sources && summary.sources.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+                      <div className="flex flex-wrap gap-1">
+                        {summary.sources.map((source, index) => (
+                          <a
+                            key={index}
+                            href={typeof source === 'string' ? source : (source.url || source.name || source)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
+                            title={typeof source === 'string' ? source : (source.url || source.name || source)}
+                          >
+                            {typeof source === 'string' 
+                              ? source 
+                              : (source.name || source.url || source)}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             )}
