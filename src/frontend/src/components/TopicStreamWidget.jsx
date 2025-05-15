@@ -449,9 +449,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                   Export
                 </button>
 
-                {/* Export Options Dropdown - positioned relative to the main flex-col container */}
+                {/* Export Options Dropdown - positioned relative to the Export button */}
                 {showExportOptions && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10"> {/* Position dropdown */}
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10"> {/* Position dropdown below button */}
                     <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
                       <button
                         onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
@@ -505,22 +505,26 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 font-medium">
                       {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
                     </span>
-                    {/* Model Badge */}
+                    {/* Model Badge - Ensure model_type exists before rendering */}
+                    {summary.model_type && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{summary.model_type}</span>
+                    )}
 
                     {/* Summary Actions - Deep Dive Chat and Delete */}
                     <div className="flex space-x-2 items-center ml-auto"> {/* Added ml-auto to push to the right */}
                        <button
                         onClick={() => handleDeepDive(summary)}
-                        className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
+                        className="text-xs p-1 rounded-md bg-cyan-500 text-white hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 transition-colors"
+                        title="Deep Dive Chat"
                       >
-                        Deep Dive Chat
+                        <img src="/deepdivechat.svg" alt="Deep Dive Chat" className="h-6 w-6" />
                       </button>
                        <SummaryDeleteButton
                         streamId={stream.id}
                         summaryId={summary.id}
                         onSummaryDeleted={handleSummarySuccessfullyDeleted}
                         onError={handleSummaryDeletionError}
+                        isIconOnly={true}
                       />
                     </div>
                   </div>
@@ -598,13 +602,24 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
           )}
 
           {showDeleteStreamConfirm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  Delete Topic Stream
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={cancelDeleteStream}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
+                <h3 
+                  className="text-lg font-medium text-gray-900 dark:text-white mb-4"
+                  style={{
+                    width: 'calc(100% - 40px)',
+                    maxWidth: 'calc(100% - 40px)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    display: 'block'
+                  }}
+                  title={stream.query}
+                >
+                  Delete Topic Stream: {stream.query}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  Are you sure you want to delete the entire topic stream "{stream.query}"? This action cannot be undone, and all associated summaries will be permanently deleted.
+                  Are you sure you want to delete this topic stream? This action cannot be undone, and all associated summaries will be permanently deleted.
                 </p>
                 <div className="flex justify-end space-x-3">
                   <button
