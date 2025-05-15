@@ -505,8 +505,10 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 font-medium">
                       {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
                     </span>
-                    {/* Model Badge */}
+                    {/* Model Badge - Ensure model_type exists before rendering */}
+                    {summary.model_type && (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{summary.model_type}</span>
+                    )}
 
                     {/* Summary Actions - Deep Dive Chat and Delete */}
                     <div className="flex space-x-2 items-center ml-auto"> {/* Added ml-auto to push to the right */}
