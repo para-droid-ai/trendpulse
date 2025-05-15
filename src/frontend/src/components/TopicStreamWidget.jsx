@@ -284,8 +284,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             
             {/* Buttons - right side, need conditional layout */}
             {isGridView ? (
-              // Grid View Layout: All buttons on one line, right-aligned
-              <div className="flex space-x-1 items-center relative"> {/* Removed ml-auto for left alignment */}
+              <div className="flex space-x-1 items-center relative"> {/* Left-aligned */}
                 {/* Edit Button for Grid View */}
                 <button
                   onClick={handleEdit}
@@ -323,7 +322,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
                 {/* Export Options Dropdown - positioned relative to this container */}
                 {showExportOptions && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10"> {/* Position dropdown */}
+                  <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10"> {/* Position dropdown */}
                     <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
                       <button
                         onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
@@ -351,7 +350,6 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                 )}
               </div>
             ) : (
-              // List View Layout: Edit/Update on first line, Delete/Export on second, both right-aligned
               <div className="flex flex-col items-end space-y-1 relative"> {/* items-end aligns flex items to the right */}
                 {/* First line: Edit, Update Now */}
                 <div className="flex space-x-1"> {/* Container for first line buttons */}
@@ -447,13 +445,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     {/* Model Badge */}
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{summary.model_type}</span>
 
-                    {/* Summary Actions - Deep Dive and Delete */}
-                    <div className="flex space-x-2 items-center ml-auto"> {/* Added ml-auto to push buttons to the right */}
+                    {/* Summary Actions - Deep Dive Chat and Delete */}
+                    <div className="flex space-x-2 items-center ml-auto"> {/* Added ml-auto to push to the right */}
                        <button
                         onClick={() => handleDeepDive(summary)}
                         className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
                       >
-                        Deep Dive
+                        Deep Dive Chat
                       </button>
                        <SummaryDeleteButton
                         streamId={stream.id}
@@ -479,7 +477,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
-                            title={typeof source === 'string' ? source : (source.url || source.name || source)}
+                            title={typeof source === 'string' ? source : (source.url || source)}
                           >
                             {typeof source === 'string' 
                               ? source 
@@ -540,7 +538,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
               <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  Delete Topic Stream?
+                  Delete Topic Stream
                 </h3>
                 <p className="text-gray-600 dark:text-gray-300 mb-6">
                   Are you sure you want to delete the entire topic stream "{stream.query}"? This action cannot be undone, and all associated summaries will be permanently deleted.
