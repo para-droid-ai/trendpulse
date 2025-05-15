@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { topicStreamAPI } from '../services/api';
-import { format } from 'date-fns';
+import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import DeepDiveChat from './DeepDiveChat';
 import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
@@ -115,6 +116,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     return null;
   }
 
+  // Calculate time since last update
+  const lastUpdateTimestamp = summaries.length > 0 ? summaries[0].created_at : null;
+  const timeSinceLastUpdate = lastUpdateTimestamp 
+    ? formatDistanceToNowStrict(toZonedTime(parseISO(lastUpdateTimestamp), 'America/New_York'), { addSuffix: true })
+    : 'Never updated';
+
   if (showEditForm) {
     return (
       <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 overflow-hidden shadow-sm`}>
@@ -152,6 +159,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             </span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
               {stream.model_type}
+            </span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+              {timeSinceLastUpdate}
             </span>
           </div>
         </div>
@@ -200,9 +210,14 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             <div key={summary.id} className="p-4">
               <div className="mb-2 flex justify-between items-center">
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {format(new Date(summary.created_at), 'MMM d, yyyy h:mm a')}
+                  {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at), 'America/New_York'), 'America/New_York', 'MMM d, yyyy h:mm a') : ''}
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 items-center">
+                   {summary.model && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                      {summary.model}
+                    </span>
+                  )}
                   <button
                     onClick={() => handleDeepDive(summary)}
                     className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
@@ -220,7 +235,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               
               <div 
                 className={`prose prose-sm max-w-none dark:prose-invert overflow-hidden ${
-                  expandedSummaryId !== summary.id && 'line-clamp-7'
+                  expandedSummaryId !== summary.id && 'line-clamp-15'
                 }`}
               >
                 <MarkdownRenderer content={summary.content} />
@@ -260,9 +275,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
       {showDeepDive && selectedSummary && (
         <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-3/4 max-h-[90vh] overflow-hidden flex flex-col">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300 truncate flex-1 min-w-0">
                 Deep Dive: {stream.query}
               </h3>
               <button
@@ -275,18 +290,26 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               </button>
             </div>
             
-            <div className="p-4 border-b dark:border-gray-700 overflow-y-auto">
-              <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Summary</h4>
-              <MarkdownRenderer content={selectedSummary.content} />
-            </div>
-            
-            <div className="flex-1 overflow-hidden">
-              <DeepDiveChat 
-                topicStreamId={stream.id} 
-                summaryId={selectedSummary.id}
-                topic={stream.query}
-                onAppend={handleAppendSummary}
-              />
+            {/* Main content area with two columns */}
+            <div className="flex flex-1 overflow-hidden flex-row">
+              {/* Original Summary Section - Left Column */}
+              <div className="flex-1 basis-1/2 p-4 border-r dark:border-gray-700 overflow-y-auto">
+                <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Summary</h4>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  {selectedSummary.created_at ? formatInTimeZone(toZonedTime(parseISO(selectedSummary.created_at), 'America/New_York'), 'America/New_York', 'MMM d, yyyy h:mm a') : ''} • Model: {selectedSummary.model_type}
+                </div>
+                <MarkdownRenderer content={selectedSummary.content} />
+              </div>
+              
+              {/* Deep Dive Chat Section - Right Column */}
+              <div className="flex-1 basis-1/2 overflow-hidden">
+                <DeepDiveChat 
+                  topicStreamId={stream.id} 
+                  summaryId={selectedSummary.id}
+                  topic={stream.query}
+                  onAppend={handleAppendSummary}
+                />
+              </div>
             </div>
           </div>
         </div>

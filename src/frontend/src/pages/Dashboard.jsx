@@ -6,6 +6,7 @@ import TopicStreamForm from '../components/TopicStreamForm';
 import TopicStreamWidget from '../components/TopicStreamWidget'; // Correct relative path
 import { format } from 'date-fns';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import DeepDiveChat from '../components/DeepDiveChat';
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -22,6 +23,9 @@ const Dashboard = () => {
   const [currentMobileIndex, setCurrentMobileIndex] = useState(0);
   const [allSummaries, setAllSummaries] = useState([]);
   const [loadingSummaries, setLoadingSummaries] = useState(false);
+  const [showDeepDive, setShowDeepDive] = useState(false);
+  const [selectedSummary, setSelectedSummary] = useState(null);
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   
   // Function to toggle between view modes
   const toggleViewMode = () => {
@@ -69,6 +73,11 @@ const Dashboard = () => {
             // Ensure we have a valid date for sorting
             created_at: summary.created_at || new Date().toISOString()
           })))
+        .catch(err => {
+          console.error(`Failed to fetch summaries for stream ${stream.id}:`, err);
+          // Return an empty array for this stream if fetching fails
+          return [];
+        })
         : Promise.resolve([]) // If stream is invalid, resolve with an empty array
       );
       
@@ -264,6 +273,26 @@ const Dashboard = () => {
     }
   };
 
+  const handleAppendSummary = async (newSummary) => {
+    try {
+      // This function is called from DeepDiveChat when a summary is saved from chat
+      // We need to update the allSummaries state
+      setAllSummaries(prev => [
+        {
+          ...newSummary,
+          streamQuery: selectedStream?.query || '', // Use the selected stream's query
+          streamId: selectedStream?.id || null, // Use the selected stream's ID
+        },
+        ...prev
+      ]);
+      setError(''); // Clear any previous errors
+    } catch (err) {
+       console.error('Failed to append summary to state:', err);
+       // Optionally set an error state if needed
+       // setError('Failed to add summary to feed.');
+    }
+  };
+
   const handleDragStart = (e, streamId) => {
     setDraggedStreamId(streamId);
     e.dataTransfer.effectAllowed = 'move';
@@ -382,9 +411,9 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#f7f7f8] dark:bg-[#1c1c1e]">
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#1c1c1e]' : 'bg-[#f7f7f8]'}`}>
       {/* Header */}
-      <header className="bg-[#f7f7f8] dark:bg-[#2a2a2e] shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50">
+      <header className={`shadow-sm border-b dark:border-slate-700 sticky top-0 z-50 ${theme === 'dark' ? 'bg-[#2a2a2e]' : 'bg-[#f7f7f8]'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
             className="text-3xl font-bold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
@@ -658,6 +687,73 @@ const Dashboard = () => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" data-testid="deleting-overlay">
           <div className="bg-white dark:bg-[#2a2a2e] rounded-lg p-4 shadow-xl">
             <p className="text-slate-700 dark:text-slate-200">Deleting topic stream...</p>
+          </div>
+        </div>
+      )}
+
+      {showDeepDive && selectedSummary && (
+        <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              {/* Truncated Stream Title */}
+              <div className="flex-1 overflow-hidden min-w-0 mr-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300 truncate">
+                  Deep Dive: {selectedStream.query}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowDeepDive(false)}
+                className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Main content area with two columns */}
+            <div className="flex flex-1 overflow-hidden flex-row">
+
+              {/* Original Summary Section - Left Column */}
+              <div className="w-1/2 p-4 border-r dark:border-gray-700 overflow-y-auto">
+                <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Original Summary</h4>
+                {/* Render summary with potential truncation and Read More - Keep as is for now */}
+                <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? '' : ''}`}> {/* Removed line-clamp, summary should be fully visible */}
+                    <MarkdownRenderer content={selectedSummary.content} />
+                </div>
+                 {/* Removed Read More button - summary is fully visible */}
+                 
+                {/* Summary Sources - Moved below summary content - Keep as is for now */}
+                {selectedSummary.sources && selectedSummary.sources.length > 0 && (
+                    <div className="mt-4">
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+                        <div className="flex flex-wrap gap-1">
+                            {selectedSummary.sources.map((source, index) => (
+                                <a
+                                    key={index}
+                                    href={source}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900 px-2 py-1 rounded-full truncate max-w-[200px]"
+                                >
+                                    {source}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+              </div>
+
+              {/* Deep Dive Chat Section - Right Column */}
+              <div className="flex-1 overflow-hidden">
+                <DeepDiveChat 
+                  topicStreamId={selectedStream.id}
+                  summaryId={selectedSummary.id}
+                  topic={selectedStream.query}
+                  onAppend={handleAppendSummary}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}

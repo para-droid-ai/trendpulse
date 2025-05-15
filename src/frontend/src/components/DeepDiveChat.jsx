@@ -160,27 +160,43 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
               
               {message.type==='user'
                 ? <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 text-sm">{message.content}</div>
-                : <div className="text-sm"><MarkdownRenderer content={message.content} /></div>
-              }
-              
-              {message.type==='ai' && message.sources && message.sources.length > 0 && message.model !== 'r1-1776' && (
-                <div className="mt-2">
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
-                  <div className="flex flex-wrap gap-1">
-                    {message.sources.map((src,i)=>(
-                      <a 
-                        key={i} 
-                        href={src} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-700 px-2 py-1 rounded-full truncate max-w-[200px]"
+                : (
+                  <div className="text-sm">
+                    {/* Summary Content with Read More */}
+                    <div className={`prose prose-sm max-w-none dark:prose-invert overflow-hidden ${!message.isExpanded ? 'line-clamp-10' : ''}`}>
+                      <MarkdownRenderer content={message.content} />
+                    </div>
+                    {message.content && message.content.length > 500 && (
+                      <button
+                        onClick={() => setMessages(prev => prev.map(msg => msg.id === message.id ? { ...msg, isExpanded: !msg.isExpanded } : msg))}
+                        className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
                       >
-                        {src}
-                      </a>
-                    ))}
+                        {message.isExpanded ? 'Read less' : 'Read more'}
+                      </button>
+                    )}
+
+                    {/* Summary Sources - Moved below summary content */}
+                    {message.sources && message.sources.length > 0 && message.model !== 'r1-1776' && (
+                      <div className="mt-4">
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {message.sources.map((src,i)=>(
+                            <a 
+                              key={i} 
+                              href={src} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-700 px-2 py-1 rounded-full truncate max-w-[200px]" 
+                            >
+                              {src}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                )
+              }
               
               {message.type === 'ai' && (
                 <div className="mt-2 flex justify-end">

@@ -6,11 +6,11 @@ export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
-    // Force light theme and store it
-    localStorage.setItem('theme', 'light');
-    document.documentElement.classList.remove('dark', 'light');
-    document.documentElement.classList.add('light');
-  }, []);
+    // Read theme from localStorage on mount, default to light
+    const savedTheme = localStorage.getItem('theme');
+    const initialTheme = savedTheme || 'light';
+    setTheme(initialTheme);
+  }, []); // Run only on mount
 
   useEffect(() => {
     document.documentElement.classList.remove('dark', 'light');
