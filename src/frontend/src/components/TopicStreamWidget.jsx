@@ -16,6 +16,8 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   const [updating, setUpdating] = useState(false);
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState('');
 
   // State for deleting the WHOLE stream (keep existing)
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
@@ -29,7 +31,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
       setLoading(true);
       setError('');
       const data = await topicStreamAPI.getSummaries(stream.id);
-      setSummaries(data);
+      // Map summaries to explicitly include model_type from the stream
+      const summariesWithModel = data.map(summary => ({
+        ...summary,
+        model_type: stream.model_type, // Ensure model_type from the stream is included
+      }));
+      setSummaries(summariesWithModel);
+      console.log('Fetched summaries data:', data);
     } catch (err) {
       console.error('Failed to load summaries:', err);
       setError('Failed to load summaries. Please try refreshing.');
@@ -112,6 +120,118 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     }
   };
 
+  // Function to format stream content for export
+  const formatStreamContent = (streamData, summariesData, formatType = 'md') => {
+    let content = ``;
+
+    if (formatType === 'md') {
+      content += `# ${streamData.query}\n\n`;
+      content += `*Update Frequency:* ${streamData.update_frequency}\n`;
+      content += `*Detail Level:* ${streamData.detail_level}\n`;
+      if (streamData.last_updated) {
+        // Re-use the date formatting logic for consistency
+        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const lastUpdatedFormatted = formatInTimeZone(toZonedTime(parseISO(streamData.last_updated + 'Z'), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a');
+        content += `*Last Updated:* ${lastUpdatedFormatted}\n`;
+      }
+      content += `\n---\n\n`;
+
+      summariesData.forEach((summary, index) => {
+        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const createdAtFormatted = summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : '';
+
+        content += `## Summary ${summariesData.length - index}\n\n`;
+        content += `*Generated:* ${createdAtFormatted}\n`;
+        if (summary.model) {
+          content += `*Model:* ${summary.model}\n`;
+        }
+        content += `\n${summary.content}\n\n`;
+
+        if (summary.sources && summary.sources.length > 0) {
+          content += `*Sources:*\n`;
+          summary.sources.forEach(source => {
+             // Handle potential source objects or strings
+            const sourceUrl = typeof source === 'string' ? source : (source.url || source.name || source);
+            if (sourceUrl) {
+              content += `- [${sourceUrl}](${sourceUrl})\n`;
+            }
+          });
+          content += `\n`;
+        }
+         content += `\n---\n\n`;
+      });
+
+    } else { // txt format
+       content += `${streamData.query}\n\n`;
+      content += `Update Frequency: ${streamData.update_frequency}\n`;
+      content += `Detail Level: ${streamData.detail_level}\n`;
+        if (streamData.last_updated) {
+        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const lastUpdatedFormatted = formatInTimeZone(toZonedTime(parseISO(streamData.last_updated + 'Z'), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a');
+        content += `Last Updated: ${lastUpdatedFormatted}\n`;
+      }
+      content += `\n---\n\n`;
+
+      summariesData.forEach((summary, index) => {
+        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const createdAtFormatted = summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : '';
+
+        content += `Summary ${summariesData.length - index}\n\n`;
+        content += `Generated: ${createdAtFormatted}\n`;
+         if (summary.model) {
+          content += `Model: ${summary.model}\n`;
+        }
+        content += `\n${summary.content}\n\n`;
+
+        if (summary.sources && summary.sources.length > 0) {
+          content += `Sources:\n`;
+          summary.sources.forEach(source => {
+             const sourceUrl = typeof source === 'string' ? source : (source.url || source.name || source);
+             if(sourceUrl) { // Ensure sourceUrl is not empty
+                content += `- ${sourceUrl}\n`;
+             }
+          });
+           content += `\n`;
+        }
+         content += `\n---\n\n`;
+      });
+    }
+
+    return content;
+  };
+
+  // Function to copy content to clipboard
+  const copyToClipboard = async () => {
+    const content = formatStreamContent(stream, summaries, 'txt'); // Use txt format for clipboard
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopyFeedback('Copied!');
+      console.log('Stream content copied to clipboard!');
+    } catch (err) {
+      setCopyFeedback('Failed to copy.');
+      console.error('Failed to copy stream content:', err);
+    } finally {
+      setTimeout(() => setCopyFeedback(''), 3000);
+    }
+  };
+
+  // Function to export content as a file
+  const exportAsFile = (formatType) => {
+    const content = formatStreamContent(stream, summaries, formatType);
+    const blob = new Blob([content], { type: formatType === 'md' ? 'text/markdown' : 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    // Sanitize filename (replace spaces with underscores, remove special characters)
+    const sanitizedQuery = stream.query.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
+    const filename = `${sanitizedQuery}.${formatType}`;
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url); // Clean up the object URL
+  };
+
   if (!stream) {
     return null;
   }
@@ -121,31 +241,11 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   
   // Get user's local time zone
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  console.log('User Time Zone:', userTimeZone);
 
-  const timeSinceLastUpdate = lastUpdateTimestamp 
-    ? formatDistanceToNowStrict(toZonedTime(parseISO(lastUpdateTimestamp), userTimeZone), { addSuffix: true })
+  const timeSinceLastUpdate = lastUpdateTimestamp
+    ? formatDistanceToNowStrict(toZonedTime(parseISO(lastUpdateTimestamp + 'Z'), userTimeZone), { addSuffix: true })
     : 'Never updated';
-
-  if (showEditForm) {
-    return (
-      <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 overflow-hidden shadow-sm`}>
-        <div className="p-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Topic Stream</h3>
-          <TopicStreamForm 
-            onSubmit={handleEditSubmit}
-            initialData={stream}
-            isEditing={true}
-          />
-          <button
-            onClick={() => setShowEditForm(false)}
-            className="mt-4 w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200`}>
@@ -170,29 +270,139 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
           </div>
         </div>
         
-        <div className={`${isGridView ? 'flex flex-wrap gap-2 w-full justify-start' : 'flex space-x-1'}`}>
-          <button
-            onClick={handleEdit}
-            className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-          >
-            Edit
-          </button>
-          <button
-            onClick={handleUpdateNow}
-            disabled={updating}
-            className={`text-xs py-1 px-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${
-              updating ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            {updating ? 'Updating...' : 'Update Now'}
-          </button>
-          <button
-            onClick={handleDeleteStream}
-            className="text-xs py-1 px-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-          >
-            Delete Topic Stream
-          </button>
-        </div>
+        {/* Buttons - right side, need conditional layout */}
+        {isGridView ? (
+          // Grid View Layout: Revert to original layout (left-aligned, all on one line)
+          <div className="flex flex-wrap gap-2 w-full justify-start relative"> {/* Revert to justify-start */}
+            <button
+              onClick={handleEdit}
+              className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={handleUpdateNow}
+              disabled={updating}
+              className={`text-xs py-1 px-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${
+                updating ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {updating ? 'Updating...' : 'Update Now'}
+            </button>
+
+            {/* Delete Button for Grid View */}
+            <button
+              onClick={handleDeleteStream}
+              className="text-xs py-1 px-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+            >
+              Delete Stream
+            </button>
+
+            {/* Export Button for Grid View */}
+            <button
+              onClick={() => setShowExportOptions(!showExportOptions)}
+              className="text-xs py-1 px-2 rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors"
+            >
+              Export
+            </button>
+
+            {/* Export Options Dropdown - positioned relative to this container */}
+            {showExportOptions && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10"> {/* Position dropdown */}
+                <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                  <button
+                    onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    role="menuitem"
+                  >
+                    Copy to Clipboard
+                  </button>
+                  <button
+                    onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    role="menuitem"
+                  >
+                    Export as .md
+                  </button>
+                  <button
+                    onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    role="menuitem"
+                  >
+                    Export as .txt
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          // List View Layout: Edit/Update on first line, Delete/Export on second, both right-aligned
+          <div className="flex flex-col items-end space-y-1 relative"> {/* items-end aligns flex items to the right */}
+            {/* First line: Edit, Update Now */}
+            <div className="flex space-x-1"> {/* Container for first line buttons */}
+              <button
+                onClick={handleEdit}
+                className="text-xs py-1 px-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+              >
+                Edit
+              </button>
+              <button
+                onClick={handleUpdateNow}
+                disabled={updating}
+                className={`text-xs py-1 px-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${
+                  updating ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                {updating ? 'Updating...' : 'Update Now'}
+              </button>
+            </div>
+
+            {/* Second line: Delete, Export */}
+            <div className="flex space-x-1 justify-end w-full"> {/* Ensure buttons are right-aligned on this line */}
+              <button
+                onClick={handleDeleteStream}
+                className="text-xs py-1 px-2 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Delete Stream
+              </button>
+              <button
+                onClick={() => setShowExportOptions(!showExportOptions)}
+                className="text-xs py-1 px-2 rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors"
+              >
+                Export
+              </button>
+            </div>
+
+            {/* Export Options Dropdown - positioned relative to the main flex-col container */}
+            {showExportOptions && (
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10"> {/* Position dropdown */}
+                <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                  <button
+                    onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    role="menuitem"
+                  >
+                    Copy to Clipboard
+                  </button>
+                  <button
+                    onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    role="menuitem"
+                  >
+                    Export as .md
+                  </button>
+                  <button
+                    onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    role="menuitem"
+                  >
+                    Export as .txt
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {error && !showDeleteStreamConfirm && (
@@ -212,66 +422,55 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
         ) : (
           summaries.map((summary) => (
             <div key={summary.id} className="p-4">
-              <div className="mb-2 flex justify-between items-center">
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : ''}
-                </div>
-                <div className="flex space-x-2 items-center">
-                   {summary.model && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                      {summary.model}
-                    </span>
-                  )}
+              <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Summary</h4>
+               <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 font-medium">
+                    {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
+                  </span>
+                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{summary.model_type}</span>
+               </div>
+               <div className={`prose prose-sm max-w-none dark:prose-invert`}>
+                 <MarkdownRenderer content={summary.content} />
+               </div>
+               
+               {/* Summary Actions */}
+               <div className="flex space-x-2 mt-4">
                   <button
-                    onClick={() => handleDeepDive(summary)}
-                    className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
-                  >
-                    Deep Dive
-                  </button>
+                   onClick={() => handleDeepDive(summary)}
+                   className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full"
+                 >
+                   Deep Dive
+                 </button>
                   <SummaryDeleteButton 
-                    streamId={stream.id} 
-                    summaryId={summary.id}
-                    onSummaryDeleted={handleSummarySuccessfullyDeleted}
-                    onError={handleSummaryDeletionError} 
-                  />
-                </div>
-              </div>
+                   streamId={stream.id} 
+                   summaryId={summary.id}
+                   onSummaryDeleted={handleSummarySuccessfullyDeleted}
+                   onError={handleSummaryDeletionError} 
+                 />
+               </div>
               
-              <div 
-                className={`prose prose-sm max-w-none dark:prose-invert overflow-hidden ${
-                  expandedSummaryId !== summary.id && 'line-clamp-15'
-                }`}
-              >
-                <MarkdownRenderer content={summary.content} />
-              </div>
-              
-              {summary.content && summary.content.length > 300 && (
-                <button
-                  onClick={() => toggleExpandSummary(summary.id)}
-                  className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
-                >
-                  {expandedSummaryId === summary.id ? 'Show less' : 'Read more'}
-                </button>
-              )}
-              
-              {summary.sources && summary.sources.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
-                  <div className="flex flex-wrap gap-1">
-                    {summary.sources.map((source, index) => (
-                      <a
-                        key={index}
-                        href={source}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900 px-2 py-1 rounded-full truncate max-w-[200px]"
-                      >
-                        {source}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
+               {/* Summary Sources */}
+               {summary.sources && summary.sources.length > 0 && (
+                 <div className="mt-3">
+                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+                   <div className="flex flex-wrap gap-1">
+                     {summary.sources.map((source, index) => (
+                       <a
+                         key={index}
+                         href={typeof source === 'string' ? source : (source.url || source.name || source)}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
+                         title={typeof source === 'string' ? source : (source.url || source.name || source)}
+                       >
+                         {typeof source === 'string' 
+                           ? source 
+                           : (source.name || source.url || source)}
+                       </a>
+                     ))}
+                   </div>
+                 </div>
+               )}
             </div>
           ))
         )}
@@ -343,6 +542,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Display copy feedback */}
+      {copyFeedback && (
+        <div className="absolute bottom-4 right-4 px-3 py-2 bg-gray-800 text-white text-sm rounded shadow-lg z-50">
+          {copyFeedback}
         </div>
       )}
     </div>
