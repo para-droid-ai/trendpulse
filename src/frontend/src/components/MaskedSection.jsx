@@ -13,7 +13,7 @@ export default function MaskedSection({ label = 'Thoughts', children }) {
         <svg className={`h-5 w-5 transform transition-transform ${open ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 8l4 4 4-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </button>
       {open && (
-        <div className="mt-2 p-4 bg-card rounded-md border border-border text-foreground text-sm whitespace-pre-line">
+        <div className="mt-2 p-4 bg-muted rounded-md border border-border text-foreground text-sm whitespace-pre-line font-mono">
           {children}
         </div>
       )}

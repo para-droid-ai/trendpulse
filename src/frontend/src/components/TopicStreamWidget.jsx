@@ -6,6 +6,7 @@ import DeepDiveChat from './DeepDiveChat';
 import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
 import TopicStreamForm from './TopicStreamForm';
+import { useTheme } from '../context/ThemeContext';
 
 // Custom locale for abbreviated distance
 const customDistanceLocale = {
@@ -71,6 +72,8 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
   // State for deleting the WHOLE stream (keep existing)
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
+
+  const theme = useTheme();
 
   useEffect(() => {
     fetchSummaries();
@@ -544,12 +547,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                   <div className={`prose prose-sm max-w-none dark:prose-invert`}>
                     {/* Thoughts (experimental) section for this summary - Conditional rendering */}
                     {summary.thoughts && (
-                      <div className="mt-4 p-3 rounded-md bg-[#23243a] dark:bg-gray-700"> {/* Thoughts container with light/dark background */}
-                        <div className="text-sm font-medium text-muted-foreground mb-2"> {/* Text color for label */}
+                      <div className="mb-4 p-3 rounded-md border border-border text-foreground text-sm whitespace-pre-line bg-muted dark-thoughts-mask-bg"> {/* Removed bg-card class */}
+                        <div className="text-sm font-medium text-muted-foreground mb-2">
                           Thoughts (experimental)
                         </div>
                         <div className="prose prose-sm max-w-none dark:prose-invert"> {/* Markdown rendering for thoughts content */}
-                          <MarkdownRenderer content={summary.thoughts} /> {/* Render actual thoughts content if it exists */}
+                          <MarkdownRenderer content={summary.thoughts} />
                         </div>
                       </div>
                     )}

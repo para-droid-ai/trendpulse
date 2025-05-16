@@ -634,7 +634,7 @@ const Dashboard = () => {
                           className={`${dragOverStreamId === stream.id ? 'border-2 border-primary' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
                         >
                           <button
-                            className={`w-full text-left p-4 hover:bg-muted/50 flex items-center ${selectedStream?.id === stream.id ? 'bg-muted' : ''}`}
+                            className={`w-full text-left p-4 hover:bg-muted/50 flex items-center ${selectedStream?.id === stream.id ? 'bg-muted dark:bg-primary/20' : ''}`}
                             onClick={() => setSelectedStream(stream)}
                           >
                             <div className="mr-2 cursor-move text-muted-foreground">

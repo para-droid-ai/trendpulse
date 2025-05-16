@@ -82,6 +82,7 @@ class TopicStreamCreate(BaseModel):
     model_type: str       # Will be converted to ModelType
     recency_filter: str
     system_prompt: Optional[str] = None
+    temperature: float = 0.7 # Add temperature with default
 
 class TopicStreamResponse(BaseModel):
     id: int
@@ -92,6 +93,7 @@ class TopicStreamResponse(BaseModel):
     recency_filter: str
     last_updated: Optional[datetime]
     system_prompt: Optional[str] = None
+    temperature: float # Add temperature to response model
     
     class Config:
         orm_mode = True
@@ -275,7 +277,7 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
                 model=model,
                 recency_filter=topic_stream.recency_filter,
                 previous_summary=prev_summary_content,  # Pass the previous summary for context
-                temperature=0.2,
+                temperature=topic_stream.temperature,
                 max_tokens=max_tokens_for_api # Use dynamic max_tokens
             )
             logger.debug(f"API call successful, received response of {len(str(result))} characters")
@@ -428,7 +430,8 @@ async def create_topic_stream(
             detail_level=detail_lvl,
             model_type=model,
             recency_filter=topic_stream.recency_filter,
-            system_prompt=topic_stream.system_prompt
+            system_prompt=topic_stream.system_prompt,
+            temperature=topic_stream.temperature
         )
         
         logger.debug("Created TopicStream object")
@@ -695,7 +698,7 @@ async def deep_dive(
             query=contextual_question, 
             model=model_to_use, 
             recency_filter="all_time",
-            temperature=0.2, 
+            temperature=topic_stream.temperature,
             max_tokens=1000 # Using 1000 as per previous attempt, can be adjusted
         )
     except Exception as e:
@@ -848,6 +851,7 @@ async def update_topic_stream(
         db_topic_stream.model_type = model
         db_topic_stream.recency_filter = topic_stream.recency_filter
         db_topic_stream.system_prompt = topic_stream.system_prompt
+        db_topic_stream.temperature = topic_stream.temperature
         
         db.commit()
         db.refresh(db_topic_stream)
