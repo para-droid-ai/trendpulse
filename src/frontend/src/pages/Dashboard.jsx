@@ -454,6 +454,7 @@ const Dashboard = () => {
             className="text-3xl font-bold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
             onClick={() => window.location.href = '/'}
           >
+            <img src="/trendpulse_logo_1.svg" alt="TrendPulse Logo" className="inline-block h-9 w-9 mr-2 align-text-bottom" />
             TrendPulse Dashboard
           </h1>
           <div className="flex items-center space-x-4">
