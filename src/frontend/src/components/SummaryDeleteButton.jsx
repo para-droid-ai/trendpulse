@@ -49,7 +49,7 @@ const SummaryDeleteButton = ({ summaryId, streamId, onSummaryDeleted, onError, i
         onClick={handleDeleteClick}
         disabled={isDeleting}
         title={isIconOnly ? "Delete Summary" : undefined}
-        className={`p-1 rounded-md text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 transition-colors ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`p-1 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         {isDeleting ? (
           isIconOnly ? (
@@ -65,20 +65,20 @@ const SummaryDeleteButton = ({ summaryId, streamId, onSummaryDeleted, onError, i
       </button>
 
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={cancelDelete}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Confirm Delete</h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">Are you sure you want to delete this summary?</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75" onClick={cancelDelete}>
+          <div className="bg-card rounded-lg p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-medium text-foreground mb-4">Confirm Delete</h3>
+            <p className="text-muted-foreground mb-6">Are you sure you want to delete this summary?</p>
             <div className="flex justify-end space-x-3">
               <button
                 onClick={cancelDelete}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-md hover:bg-muted/80"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600"
+                className="px-4 py-2 text-sm font-medium bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
               >
                 Delete
               </button>

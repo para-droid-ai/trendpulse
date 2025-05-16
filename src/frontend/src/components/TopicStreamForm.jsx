@@ -160,14 +160,14 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {errors.submission && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded">
           {errors.submission}
         </div>
       )}
       
       <div>
-        <label htmlFor="query" className="block text-sm font-medium text-gray-700">
-          Topic Query <span className="text-red-500">*</span>
+        <label htmlFor="query" className="block text-sm font-medium text-foreground">
+          Topic Query <span className="text-destructive">*</span>
         </label>
         <div className="mt-1">
           <textarea
@@ -176,24 +176,24 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             value={formData.query}
             onChange={handleChange}
             rows={3}
-            className={`shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md resize-y ${
-              errors.query ? 'border-red-500' : ''
-            }`}
+            className={`shadow-sm focus:ring-ring focus:border-border block w-full sm:text-sm border-border rounded-md resize-y ${
+              errors.query ? 'border-destructive' : ''
+            } bg-background text-foreground placeholder-muted-foreground`}
             placeholder="Enter a topic query, e.g., 'latest AI developments'"
             data-testid="topic-query-input"
           />
           {errors.query && (
-            <p className="mt-1 text-sm text-red-600">{errors.query}</p>
+            <p className="mt-1 text-sm text-destructive">{errors.query}</p>
           )}
         </div>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-muted-foreground">
           This query will be used to search for information on this topic.
         </p>
       </div>
       
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div>
-          <label htmlFor="update_frequency" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="update_frequency" className="block text-sm font-medium text-foreground">
             Update Frequency
           </label>
           <select
@@ -201,9 +201,9 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             name="update_frequency"
             value={formData.update_frequency}
             onChange={handleChange}
-            className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md ${
-              errors.update_frequency ? 'border-red-500' : ''
-            }`}
+            className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-ring focus:border-border sm:text-sm rounded-md ${
+              errors.update_frequency ? 'border-destructive' : ''
+            } bg-background text-foreground`}
             data-testid="update-frequency-select"
           >
             {updateFrequencyOptions.map((option) => (
@@ -213,12 +213,12 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             ))}
           </select>
           {errors.update_frequency && (
-            <p className="mt-1 text-sm text-red-600">{errors.update_frequency}</p>
+            <p className="mt-1 text-sm text-destructive">{errors.update_frequency}</p>
           )}
         </div>
         
         <div>
-          <label htmlFor="detail_level" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="detail_level" className="block text-sm font-medium text-foreground">
             Detail Level
           </label>
           <select
@@ -226,9 +226,9 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             name="detail_level"
             value={formData.detail_level}
             onChange={handleChange}
-            className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md ${
-              errors.detail_level ? 'border-red-500' : ''
-            }`}
+            className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-ring focus:border-border sm:text-sm rounded-md ${
+              errors.detail_level ? 'border-destructive' : ''
+            } bg-background text-foreground`}
             data-testid="detail-level-select"
           >
             {detailLevelOptions.map((option) => (
@@ -238,12 +238,12 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             ))}
           </select>
           {errors.detail_level && (
-            <p className="mt-1 text-sm text-red-600">{errors.detail_level}</p>
+            <p className="mt-1 text-sm text-destructive">{errors.detail_level}</p>
           )}
         </div>
         
         <div>
-          <label htmlFor="model_type" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="model_type" className="block text-sm font-medium text-foreground">
             Model Type
           </label>
           <select
@@ -251,9 +251,9 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             name="model_type"
             value={formData.model_type}
             onChange={handleChange}
-            className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md ${
-              errors.model_type ? 'border-red-500' : ''
-            }`}
+            className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-ring focus:border-border sm:text-sm rounded-md ${
+              errors.model_type ? 'border-destructive' : ''
+            } bg-background text-foreground`}
             data-testid="model-type-select"
           >
             {modelTypeOptions.map((option) => (
@@ -263,13 +263,13 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             ))}
           </select>
           {errors.model_type && (
-            <p className="mt-1 text-sm text-red-600">{errors.model_type}</p>
+            <p className="mt-1 text-sm text-destructive">{errors.model_type}</p>
           )}
         </div>
         
         <div>
-          <label htmlFor="temperature" className="block text-sm font-medium text-gray-700">
-            Temperature <span className="ml-2 text-xs text-gray-500">({formData.temperature})</span>
+          <label htmlFor="temperature" className="block text-sm font-medium text-foreground">
+            Temperature <span className="ml-2 text-xs text-muted-foreground">({formData.temperature})</span>
           </label>
           <input
             type="range"
@@ -280,17 +280,17 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             step="0.01"
             value={formData.temperature}
             onChange={handleChange}
-            className="w-full mt-1"
+            className="w-full mt-1 accent-primary"
           />
           {errors.temperature && (
-            <p className="mt-1 text-sm text-red-600">{errors.temperature}</p>
+            <p className="mt-1 text-sm text-destructive">{errors.temperature}</p>
           )}
         </div>
         
         {/* Custom System Prompt */}
         <div className="sm:col-span-2">
-          <label htmlFor="system_prompt" className="block text-sm font-medium text-gray-700">
-            Custom System Prompt <span className="text-xs text-gray-400">(optional)</span>
+          <label htmlFor="system_prompt" className="block text-sm font-medium text-foreground">
+            Custom System Prompt <span className="text-xs text-muted-foreground">(optional)</span>
           </label>
           <textarea
             id="system_prompt"
@@ -298,14 +298,14 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             value={formData.system_prompt}
             onChange={handleChange}
             rows={3}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className="mt-1 block w-full border border-border rounded-md shadow-sm focus:ring-ring focus:border-border sm:text-sm bg-background text-foreground placeholder-muted-foreground"
             placeholder="Enter a custom system prompt to override the default..."
           />
-          <p className="mt-1 text-xs text-gray-500">If provided, this will replace the default system prompt for this stream.</p>
+          <p className="mt-1 text-xs text-muted-foreground">If provided, this will replace the default system prompt for this stream.</p>
         </div>
 
         <div>
-          <label htmlFor="recency_filter" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="recency_filter" className="block text-sm font-medium text-foreground">
             Recency Filter
           </label>
           <select
@@ -313,9 +313,9 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             name="recency_filter"
             value={formData.recency_filter}
             onChange={handleChange}
-            className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md ${
-              errors.recency_filter ? 'border-red-500' : ''
-            }`}
+            className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-ring focus:border-border sm:text-sm rounded-md ${
+              errors.recency_filter ? 'border-destructive' : ''
+            } bg-background text-foreground`}
             data-testid="recency-filter-select"
           >
             {recencyFilterOptions.map((option) => (
@@ -325,7 +325,7 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
             ))}
           </select>
           {errors.recency_filter && (
-            <p className="mt-1 text-sm text-red-600">{errors.recency_filter}</p>
+            <p className="mt-1 text-sm text-destructive">{errors.recency_filter}</p>
           )}
         </div>
       </div>
@@ -334,17 +334,17 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
         <button
           type="submit"
           disabled={isSubmitting}
-          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${isSubmitting ? 'opacity-75 cursor-not-allowed' : ''}`}
+          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring ${isSubmitting ? 'opacity-75 cursor-not-allowed' : ''}`}
           data-testid="update-stream-button"
         >
-          {isSubmitting ? 'Updating...' : 'Update Topic Stream'}
+          {isSubmitting ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Topic Stream' : 'Create Topic Stream')}
         </button>
 
         {isEditing && (
           <button
             type="button"
             onClick={onCancel}
-            className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="w-full flex justify-center py-2 px-4 border border-border rounded-md shadow-sm text-sm font-medium text-foreground bg-background hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
           >
             Cancel
           </button>

@@ -43,13 +43,13 @@ function formatDistanceLocale(token, count, options) {
       return result.other.replace('{{count}}', count);
     }
   } else {
-     // Simple case without suffix (though formatDistanceToNowStrict uses suffix) 
+     // Simple case without suffix (though formatDistanceToNowStrict uses suffix)
      // We'll return the 'other' form as a fallback.
      return result.other.replace('{{count}}', count);
   }
 }
 
-const localeWithAbbreviation = { 
+const localeWithAbbreviation = {
     formatDistance: formatDistanceLocale,
     // Include other locale properties if needed, but formatDistance is key
     localize: {}, // Assuming we don't need custom localization strings for now
@@ -100,9 +100,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     try {
       setUpdating(true);
       setError('');
-      
+
       const newSummary = await topicStreamAPI.updateNow(stream.id);
-      
+
       if (newSummary.content && newSummary.content.includes("No new information is available")) {
         setError('No new information is available since the last update.');
       } else {
@@ -133,7 +133,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     setSummaries(prevSummaries => prevSummaries.filter(s => s.id !== deletedSummaryId));
     setError('');
   };
-  
+
   const handleSummaryDeletionError = (errorMessage) => {
     setError(errorMessage);
   };
@@ -208,6 +208,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
           });
           content += `\n`;
         }
+         // Removed the extra separator inside the loop
          content += `\n---\n\n`;
       });
 
@@ -277,7 +278,6 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
-    a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url); // Clean up the object URL
   };
@@ -288,7 +288,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
   // Calculate time since last update
   const lastUpdateTimestamp = summaries.length > 0 ? summaries[0].created_at : null;
-  
+
   // Get user's local time zone
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   console.log('User Time Zone:', userTimeZone);
@@ -298,10 +298,10 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     : 'Never updated';
 
   return (
-    <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200`}>
+    <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-card border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200`}>
       {showEditForm ? (
-        <div className="p-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Edit Topic Stream</h3>
+        <div className="p-4 bg-card">
+          <h3 className="text-lg font-medium text-foreground mb-4">Edit Topic Stream</h3>
           <TopicStreamForm
             initialData={stream}
             onSubmit={handleEditSubmit}
@@ -311,210 +311,223 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
         </div>
       ) : (
         <>
-          <div className={`p-4 border-b dark:border-gray-700 flex ${isGridView ? 'flex-col space-y-4' : 'justify-between items-start'}`}>
-            <div className={`${isGridView ? 'w-full' : 'flex-1 min-w-0 mr-4'}`}>
-              <h3 className={`text-lg font-semibold text-gray-900 dark:text-white ${isGridView ? 'line-clamp-3' : 'truncate'}`}>
-                {stream.query}
-              </h3>
-              <div className="flex flex-wrap gap-2 mt-2">{/* Ensure wrapping */}
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 flex-shrink-0">{/* flex-shrink-0 */}
-                  {stream.update_frequency}
-                </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 flex-shrink-0">{/* flex-shrink-0 */}
-                  {stream.detail_level}
-                </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 flex-shrink-0">{/* flex-shrink-0 */}
-                  {stream.model_type}
-                </span>
-                {/* Time Since Last Update - Keep with other badges */}
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 flex-shrink-0">{/* flex-shrink-0 */}
-                  {timeSinceLastUpdate}
-                </span>
-              </div>
+          <div className="p-4 border-b border-border flex flex-col">
+            <div className="flex justify-between items-start">
+              <div className={`${isGridView ? 'w-full' : 'flex-1 min-w-0 mr-4'}`}>
+                <h3 className={`text-lg font-semibold text-foreground ${isGridView ? 'line-clamp-3' : 'truncate'}`}>
+                   {stream.query}
+                 </h3>
+                 {/* Tags and timestamp - Render based on isGridView */}
+                 <div className="flex flex-wrap gap-2 mt-2"> {/* Consistent tag layout */}
+                   {stream.update_frequency && (
+                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
+                       {stream.update_frequency}
+                     </span>
+                   )}
+                   {/* Detail Level Badge */}
+                   {stream.detail_level && (
+                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#25b6a5] dark:text-black">
+                       {stream.detail_level}
+                     </span>
+                   )}
+                   {/* Model Badge */}
+                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#6495ed] flex-shrink-0 dark:text-black">{/* flex-shrink-0 */}
+                     {stream.model_type}
+                   </span>
+                   {/* Time Since Last Update - Keep with other badges */}
+                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#818cf8] dark:text-black">
+                     {timeSinceLastUpdate}
+                   </span>
+                 </div>
+               </div>
+
+               {/* Action Buttons - Render based on isGridView */}
+               {!isGridView && (
+                 <div className="flex space-x-1 items-center relative flex-shrink-0 justify-end"> {/* Show only in non-grid view, aligned right */}
+                   {/* Edit Button */}
+                   <button
+                     onClick={handleEdit}
+                     className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                     title="Edit Stream"
+                   >
+                      {/* Pencil Icon */}
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                      </svg>
+                    </button>
+
+                    {/* Update Now Button */}
+                    <button
+                      onClick={handleUpdateNow}
+                      disabled={updating}
+                      className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={updating ? 'Updating...' : 'Update Now'}
+                    >
+                       {/* Using SVG file from public folder */}
+                       <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
+                     </button>
+
+                     {/* Delete Button */}
+                     <button
+                       onClick={handleDeleteStream}
+                       className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                       title="Delete Stream"
+                     >
+                        {/* Using trashcan SVG file from public folder */}
+                        <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
+                      </button>
+
+                      {/* Export Button */}
+                      <button
+                        onClick={() => setShowExportOptions(!showExportOptions)}
+                        className="py-1 px-2 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors text-xs"
+                      >
+                        Export
+                      </button>
+
+                      {/* Export Options Dropdown */}
+                      {showExportOptions && (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-popover rounded-md shadow-lg z-10"> {/* Position relative to button */}
+                          <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                            <button
+                              onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
+                              className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
+                              role="menuitem"
+                            >
+                              Copy to Clipboard
+                            </button>
+                            <button
+                              onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
+                              className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
+                              role="menuitem"
+                            >
+                              Export as .md
+                            </button>
+                            <button
+                              onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
+                              className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
+                              role="menuitem"
+                            >
+                              Export as .txt
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+               )}
             </div>
-            
-            {/* Buttons - right side, need conditional layout */}
-            {isGridView ? (
-              <div className="flex space-x-1 items-center relative flex-shrink-0 justify-end">{/* Right-aligned buttons */}
-                {/* Edit Button for Grid View - Icon */}
+
+            {/* Action buttons for grid view, placed below title/tags */}
+            {isGridView && (
+              <div className="flex space-x-1 items-center justify-end mt-2"> {/* Show only in grid view, aligned right below header */}
+                {/* Edit Button */}
                 <button
                   onClick={handleEdit}
-                  className="text-xs p-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
                   title="Edit Stream"
                 >
-                  {/* Pencil Icon */}
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                </button>
+                   {/* Pencil Icon */}
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                   </svg>
+                 </button>
 
-                {/* Update Now Button for Grid View - Icon */}
-                <button
-                  onClick={handleUpdateNow}
-                  disabled={updating}
-                  className={`text-xs p-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title={updating ? 'Updating...' : 'Update Now'}
-                >
-                   {/* Using SVG file from public folder */}
-                   <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
-                </button>
+                 {/* Update Now Button */}
+                 <button
+                   onClick={handleUpdateNow}
+                   disabled={updating}
+                   className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                   title={updating ? 'Updating...' : 'Update Now'}
+                 >
+                    {/* Using SVG file from public folder */}
+                    <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
+                 </button>
 
-                {/* Delete Button for Grid View - Icon */}
-                <button
-                  onClick={handleDeleteStream}
-                  className="text-xs p-1 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                  title="Delete Stream"
-                >
-                   {/* Using trashcan SVG file from public folder */}
-                   <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
-                </button>
+                 {/* Delete Button */}
+                 <button
+                   onClick={handleDeleteStream}
+                   className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                   title="Delete Stream"
+                 >
+                    {/* Using trashcan SVG file from public folder */}
+                    <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
+                 </button>
 
-                {/* Export Button for Grid View - Remains text */}
-                <button
-                  onClick={() => setShowExportOptions(!showExportOptions)}
-                  className="text-xs py-1 px-2 rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors"
-                >
-                  Export
-                </button>
+                 {/* Export Button */}
+                 <button
+                   onClick={() => setShowExportOptions(!showExportOptions)}
+                   className="py-1 px-2 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors text-xs"
+                 >
+                   Export
+                 </button>
 
-                {/* Export Options Dropdown - positioned relative to this container */}
-                {showExportOptions && (
-                  <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10"> {/* Position dropdown */}
-                    <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                      <button
-                        onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
-                        role="menuitem"
-                      >
-                        Copy to Clipboard
-                      </button>
-                      <button
-                        onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
-                        role="menuitem"
-                      >
-                        Export as .md
-                      </button>
-                      <button
-                        onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
-                        role="menuitem"
-                      >
-                        Export as .txt
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex space-x-1 items-center relative flex-shrink-0 justify-end"> {/* Right-aligned row of buttons */}
-                {/* Edit Button for List View - Icon */}
-                <button
-                  onClick={handleEdit}
-                  className="text-xs p-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition-colors"
-                  title="Edit Stream"
-                >
-                  {/* Pencil Icon */}
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                </button>
-
-                {/* Update Now Button for List View - Icon */}
-                <button
-                  onClick={handleUpdateNow}
-                  disabled={updating}
-                  className={`text-xs p-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title={updating ? 'Updating...' : 'Update Now'}
-                >
-                   {/* Using SVG file from public folder */}
-                   <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
-                </button>
-
-                {/* Delete Button for List View - Icon */}
-                <button
-                  onClick={handleDeleteStream}
-                  className="text-xs p-1 rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                  title="Delete Stream"
-                >
-                   {/* Using trashcan SVG file from public folder */}
-                   <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
-                </button>
-
-                {/* Export Button for List View - Remains text */}
-                <button
-                  onClick={() => setShowExportOptions(!showExportOptions)}
-                  className="text-xs py-1 px-2 rounded bg-gray-600 text-white hover:bg-gray-700 transition-colors"
-                >
-                  Export
-                </button>
-
-                {/* Export Options Dropdown - positioned relative to the Export button */}
-                {showExportOptions && (
-                  <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-700 rounded-md shadow-lg z-10"> {/* Position dropdown below button */}
-                    <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                      <button
-                        onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
-                        role="menuitem"
-                      >
-                        Copy to Clipboard
-                      </button>
-                      <button
-                        onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
-                        role="menuitem"
-                      >
-                        Export as .md
-                      </button>
-                      <button
-                        onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
-                        role="menuitem"
-                      >
-                        Export as .txt
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                 {/* Export Options Dropdown */}
+                 {showExportOptions && (
+                   <div className="absolute right-0 top-full mt-1 w-48 bg-popover rounded-md shadow-lg z-10"> {/* Position relative to button */}
+                     <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                       <button
+                         onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
+                         className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
+                         role="menuitem"
+                       >
+                         Copy to Clipboard
+                       </button>
+                       <button
+                         onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
+                         className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
+                         role="menuitem"
+                       >
+                         Export as .md
+                       </button>
+                       <button
+                         onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
+                         className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
+                         role="menuitem"
+                       >
+                         Export as .txt
+                       </button>
+                     </div>
+                   </div>
+                 )}
+               </div>
             )}
           </div>
 
+          {/* Error section */}
           {error && !showDeleteStreamConfirm && (
-            <div className="p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
+            <div className="p-4 bg-destructive/10 border-l-4 border-destructive text-destructive">
               <p>{error}</p>
-              <button onClick={() => setError('')} className="text-sm underline mt-1">Dismiss</button>
+              <button onClick={() => setError('')} className="text-sm underline mt-1 text-destructive-foreground hover:text-destructive/80">Dismiss</button>
             </div>
           )}
 
-          <div className="divide-y dark:divide-gray-700">
+          <div className="divide-y divide-border">
             {loading ? (
-              <div className="p-4 text-center text-gray-500 dark:text-gray-400">Loading summaries...</div>
+              <div className="p-4 text-center text-muted-foreground">Loading summaries...</div>
             ) : summaries.length === 0 && !error ? (
-              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+              <div className="p-4 text-center text-muted-foreground">
                 No summaries yet. Click "Update Now" to generate one.
               </div>
             ) : (
               summaries.map((summary) => (
                 <div key={summary.id} className="p-4">
-                  <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Summary</h4>
+                  <h4 className="text-md font-medium text-foreground mb-2">Summary</h4>
                   {/* Timestamp, Model, and Summary Actions */}
                   <div className="flex flex-wrap gap-2 items-center mb-2">
                     {/* Timestamp Badge */}
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 font-medium">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-black dark:text-white font-medium">
                       {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
                     </span>
                     {/* Model Badge - Ensure model_type exists before rendering */}
                     {summary.model_type && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{summary.model_type}</span>
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-black bg-[#6495ed] dark:text-black">{summary.model_type}</span>
                     )}
 
                     {/* Summary Actions - Deep Dive Chat and Delete */}
                     <div className="flex space-x-2 items-center ml-auto"> {/* Added ml-auto to push to the right */}
                        <button
                         onClick={() => handleDeepDive(summary)}
-                        className="text-xs p-1 rounded-md bg-cyan-500 text-white hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-500 transition-colors"
+                        className="text-xs p-1 rounded-md text-white bg-[#2ccebb] hover:opacity-90 transition-colors"
                         title="Deep Dive Chat"
                       >
                         <img src="/deepdivechat.svg" alt="Deep Dive Chat" className="h-6 w-6" />
@@ -529,13 +542,25 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     </div>
                   </div>
                   <div className={`prose prose-sm max-w-none dark:prose-invert`}>
+                    {/* Thoughts (experimental) section for this summary - Conditional rendering */}
+                    {summary.thoughts && (
+                      <div className="mt-4 p-3 rounded-md bg-[#23243a] dark:bg-gray-700"> {/* Thoughts container with light/dark background */}
+                        <div className="text-sm font-medium text-muted-foreground mb-2"> {/* Text color for label */}
+                          Thoughts (experimental)
+                        </div>
+                        <div className="prose prose-sm max-w-none dark:prose-invert"> {/* Markdown rendering for thoughts content */}
+                          <MarkdownRenderer content={summary.thoughts} /> {/* Render actual thoughts content if it exists */}
+                        </div>
+                      </div>
+                    )}
+                    {/* Main summary content */}
                     <MarkdownRenderer content={summary.content} />
                   </div>
 
                   {/* Summary Sources */}
                   {summary.sources && summary.sources.length > 0 && (
                     <div className="mt-3">
-                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+                      <div className="text-xs font-medium text-muted-foreground mb-1">Sources:</div>
                       <div className="flex flex-wrap gap-1">
                         {summary.sources.map((source, index) => (
                           <a
@@ -543,11 +568,11 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                             href={typeof source === 'string' ? source : (source.url || source.name || source)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
+                            className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 px-2 py-1 rounded-full truncate max-w-[200px]"
                             title={typeof source === 'string' ? source : (source.url || source)}
                           >
-                            {typeof source === 'string' 
-                              ? source 
+                            {typeof source === 'string'
+                              ? source
                               : (source.name || source.url || source)}
                           </a>
                         ))}
@@ -560,37 +585,37 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
           </div>
 
           {showDeepDive && selectedSummary && (
-            <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-3/4 max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300 truncate flex-1 min-w-0">
+            <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center p-4">
+              <div className="bg-card rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="p-4 border-b border-border flex justify-between items-center">
+                  <h3 className="text-lg font-medium text-foreground truncate flex-1 min-w-0">
                     Deep Dive: {stream.query}
                   </h3>
                   <button
                     onClick={() => setShowDeepDive(false)}
-                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
-                
+
                 {/* Main content area with two columns */}
                 <div className="flex flex-1 overflow-hidden flex-row">
                   {/* Original Summary Section - Left Column */}
-                  <div className="flex-1 basis-1/2 p-4 border-r dark:border-gray-700 overflow-y-auto">
-                    <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Summary</h4>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  <div className="flex-1 basis-1/2 p-4 border-r border-border overflow-y-auto">
+                    <h4 className="text-md font-medium text-foreground mb-2">Summary</h4>
+                    <div className="text-sm text-muted-foreground mb-2">
                       {selectedSummary.created_at ? formatInTimeZone(toZonedTime(parseISO(selectedSummary.created_at), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : ''} • Model: {selectedSummary.model_type}
                     </div>
                     <MarkdownRenderer content={selectedSummary.content} />
                   </div>
-                  
+
                   {/* Deep Dive Chat Section - Right Column */}
                   <div className="flex-1 basis-1/2 overflow-hidden">
-                    <DeepDiveChat 
-                      topicStreamId={stream.id} 
+                    <DeepDiveChat
+                      topicStreamId={stream.id}
                       summaryId={selectedSummary.id}
                       topic={stream.query}
                       onAppend={handleAppendSummary}
@@ -602,10 +627,10 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
           )}
 
           {showDeleteStreamConfirm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={cancelDeleteStream}>
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
-                <h3 
-                  className="text-lg font-medium text-gray-900 dark:text-white mb-4"
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75" onClick={cancelDeleteStream}>
+              <div className="bg-card rounded-lg p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
+                <h3
+                  className="text-lg font-medium text-foreground mb-4"
                   style={{
                     width: 'calc(100% - 40px)',
                     maxWidth: 'calc(100% - 40px)',
@@ -618,19 +643,19 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                 >
                   Delete Topic Stream: {stream.query}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                <p className="text-muted-foreground mb-6">
                   Are you sure you want to delete this topic stream? This action cannot be undone, and all associated summaries will be permanently deleted.
                 </p>
                 <div className="flex justify-end space-x-3">
                   <button
                     onClick={cancelDeleteStream}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                    className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-md hover:bg-muted/80"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={confirmDeleteStream}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                    className="px-4 py-2 text-sm font-medium text-destructive-foreground bg-destructive rounded-md hover:bg-destructive/90"
                   >
                     Delete Stream
                   </button>
@@ -641,7 +666,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
           {/* Display copy feedback */}
           {copyFeedback && (
-            <div className="absolute bottom-4 right-4 px-3 py-2 bg-gray-800 text-white text-sm rounded shadow-lg z-50">
+            <div className="absolute bottom-4 right-4 px-3 py-2 bg-foreground text-background text-sm rounded shadow-lg z-50">
               {copyFeedback}
             </div>
           )}
