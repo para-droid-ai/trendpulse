@@ -124,6 +124,37 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
     return Object.keys(newErrors).length === 0;
   };
   
+  // Mapping for detail level explanations
+  // Updated to include separate token counts for reasoning vs. non-reasoning models
+  const detailExplanationMap = {
+    'brief': { 
+      tokens: { non_reasoning: 512, reasoning: 2500 }, 
+      context: 'Low' 
+    },
+    'detailed': { 
+      tokens: { non_reasoning: 850, reasoning: 5000 }, 
+      context: 'Medium' 
+    },
+    'comprehensive': { 
+      tokens: { non_reasoning: 1200, reasoning: 8000 }, 
+      context: 'High' 
+    },
+  };
+  
+  // Define which models are considered reasoning models (should match backend logic)
+  const reasoningModels = ['sonar-reasoning', 'sonar-reasoning-pro', 'sonar-deep-research', 'r1-1776'];
+
+  // Determine if the currently selected model is a reasoning model
+  const isReasoningModel = reasoningModels.includes(formData.model_type);
+
+  // Get the current explanation based on selected detail level and model type
+  const currentDetailExplanation = detailExplanationMap[formData.detail_level] || {};
+  
+  // Get the correct token count based on whether it's a reasoning model
+  const displayedTokens = isReasoningModel 
+    ? currentDetailExplanation.tokens?.reasoning 
+    : currentDetailExplanation.tokens?.non_reasoning;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -240,6 +271,10 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
           {errors.detail_level && (
             <p className="mt-1 text-sm text-destructive">{errors.detail_level}</p>
           )}
+          {/* Dynamically display active parameters */}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Token Output: {displayedTokens}, Search Context: {currentDetailExplanation.context}
+          </p>
         </div>
         
         <div>
