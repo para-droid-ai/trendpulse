@@ -28,6 +28,9 @@ const Dashboard = () => {
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+  const [lastViewed, setLastViewed] = useState({}); // State to hold last viewed timestamps { streamId: timestamp }
+  const [sortBy, setSortBy] = useState('last_updated'); // 'last_updated'
+  const [sortDirection, setSortDirection] = useState('desc'); // 'asc' or 'desc'
   
   // Function to toggle between view modes
   const toggleViewMode = () => {
@@ -113,23 +116,68 @@ const Dashboard = () => {
     }
   };
 
-  // Load ordered streams based on saved order
-  const getOrderedStreams = (streams) => {
+  // Load ordered streams based on saved order (now used as secondary sort)
+  const getOrderedStreams = (streams, primarySortBy, primarySortDirection) => {
     try {
       const savedOrder = localStorage.getItem('streamOrder');
-      if (!savedOrder) return streams;
-      
-      const orderMap = JSON.parse(savedOrder);
+      const orderMap = savedOrder ? JSON.parse(savedOrder) : {};
+
       // Create a copy of streams to sort
       return [...streams].sort((a, b) => {
-        // Use the saved order if available, otherwise keep original order
-        const orderA = orderMap[a.id] !== undefined ? orderMap[a.id] : Infinity;
-        const orderB = orderMap[b.id] !== undefined ? orderMap[b.id] : Infinity;
-        return orderA - orderB;
+        // Primary sort by last_updated
+        const dateA = a.last_updated ? new Date(a.last_updated) : new Date(0);
+        const dateB = b.last_updated ? new Date(b.last_updated) : new Date(0);
+
+        let primarySortResult = 0;
+        if (primarySortBy === 'last_updated') {
+            if (primarySortDirection === 'desc') {
+                primarySortResult = dateB.getTime() - dateA.getTime();
+            } else {
+                primarySortResult = dateA.getTime() - dateB.getTime();
+            }
+        }
+
+        // If primary sort results are the same, use localStorage order as secondary sort
+        if (primarySortResult === 0) {
+            const orderA = orderMap[a.id] !== undefined ? orderMap[a.id] : Infinity;
+            const orderB = orderMap[b.id] !== undefined ? orderMap[b.id] : Infinity;
+            return orderA - orderB; // Always sort manual order ascending
+        }
+
+        return primarySortResult;
       });
     } catch (err) {
-      console.error('Failed to load stream order:', err);
-      return streams;
+      console.error('Failed to load stream order for sorting:', err);
+      // Fallback to sorting only by last_updated if localStorage fails
+      return [...streams].sort((a, b) => {
+         const dateA = a.last_updated ? new Date(a.last_updated) : new Date(0);
+         const dateB = b.last_updated ? new Date(b.last_updated) : new Date(0);
+         if (primarySortDirection === 'desc') {
+            return dateB.getTime() - dateA.getTime();
+         } else {
+            return dateA.getTime() - dateB.getTime();
+         }
+      });
+    }
+  };
+
+  // Save last viewed timestamps to localStorage
+  const saveLastViewed = (viewedMap) => {
+    try {
+      localStorage.setItem('lastViewed', JSON.stringify(viewedMap));
+    } catch (err) {
+      console.error('Failed to save last viewed timestamps:', err);
+    }
+  };
+
+  // Load last viewed timestamps from localStorage
+  const loadLastViewed = () => {
+    try {
+      const saved = localStorage.getItem('lastViewed');
+      return saved ? JSON.parse(saved) : {};
+    } catch (err) {
+      console.error('Failed to load last viewed timestamps:', err);
+      return {};
     }
   };
 
@@ -145,12 +193,51 @@ const Dashboard = () => {
           throw new Error("Invalid data format received from API.");
       }
       console.log(`Setting ${data.length} topic streams.`);
-      // Apply saved order to the streams
-      const orderedStreams = getOrderedStreams(data);
-      setTopicStreams(orderedStreams);
-      if (orderedStreams.length > 0 && !selectedStream) {
-        console.log("Attempting to select first stream:", orderedStreams[0]);
-        setSelectedStream(orderedStreams[0]);
+      // Apply primary sort (last_updated) and secondary sort (localStorage order) to the streams
+      const orderedStreams = getOrderedStreams(data, sortBy, sortDirection);
+      // Filter out any potentially invalid stream objects before setting state
+      const validStreams = orderedStreams.filter(stream => stream && stream.id !== undefined && stream.id !== null);
+
+      // Get the IDs of the valid streams received from the backend
+      const validStreamIds = new Set(validStreams.map(stream => stream.id));
+      // Get the IDs from the current localStorage order
+      const savedOrder = localStorage.getItem('streamOrder');
+      if (savedOrder) {
+        try {
+          const orderMap = JSON.parse(savedOrder);
+          const savedOrderIds = Object.keys(orderMap).map(id => parseInt(id, 10));
+          // Check if any ID in localStorage order is NOT in the valid streams list
+          const hasStaleIds = savedOrderIds.some(id => !validStreamIds.has(id));
+
+          if (hasStaleIds) {
+            console.log("Detected stale stream IDs in localStorage order. Clearing streamOrder.");
+            localStorage.removeItem('streamOrder');
+            // Re-fetch and re-order based on the now-cleared localStorage (will just use backend order)
+            const reOrderedStreams = getOrderedStreams(data, sortBy, sortDirection);
+            // Add an explicit filter to remove known problematic stream IDs (1, 2, 11)
+            const finalStreams = reOrderedStreams.filter(stream => ![1, 2, 11].includes(stream.id));
+            setTopicStreams(finalStreams);
+             if (finalStreams.length > 0 && !selectedStream) {
+              console.log("Attempting to select first stream after clearing localStorage:", finalStreams[0]);
+              setSelectedStream(finalStreams[0]);
+              console.log("First stream selected after clearing localStorage.");
+            }
+            return; // Exit the function after clearing and setting
+          }
+        } catch (e) {
+          console.error("Failed to parse streamOrder from localStorage:", e);
+          // If parsing fails, treat it as stale and clear
+          localStorage.removeItem('streamOrder');
+        }
+      }
+
+      // If no stale IDs or no saved order, just set the valid streams
+      // Add an explicit filter to remove known problematic stream IDs (1, 2, 11)
+      const finalStreams = validStreams.filter(stream => ![1, 2, 11].includes(stream.id));
+      setTopicStreams(finalStreams);
+      if (finalStreams.length > 0 && !selectedStream) {
+        console.log("Attempting to select first stream:", finalStreams[0]);
+        setSelectedStream(finalStreams[0]);
         console.log("First stream selected.");
       } else {
           console.log("No streams to select or stream already selected.");
@@ -163,7 +250,12 @@ const Dashboard = () => {
       setLoading(false);
       console.log("fetchTopicStreams finished.");
     }
-  }, [selectedStream]);
+  }, [selectedStream, sortBy, sortDirection]); // Added sortBy and sortDirection to dependency array
+
+  // Load last viewed timestamps on component mount
+  useEffect(() => {
+    setLastViewed(loadLastViewed());
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   // Refresh summaries when a new stream is created, updated, or deleted
   const refreshSummaries = () => {
@@ -191,10 +283,14 @@ const Dashboard = () => {
   const handleCreateStream = async (newStream) => {
     try {
       const createdStream = await topicStreamAPI.create(newStream);
-      setTopicStreams([...topicStreams, createdStream]);
+      // Add the new stream to the beginning of the list
+      const updatedStreams = [createdStream, ...topicStreams];
+      setTopicStreams(updatedStreams);
       setSelectedStream(createdStream);
       setShowForm(false);
       refreshSummaries();
+      // Save the new order immediately including the newly created stream at the top
+      saveStreamOrder(updatedStreams);
     } catch (err) {
       setError('Failed to create topic stream. Please try again.');
       console.error(err);
@@ -296,6 +392,12 @@ const Dashboard = () => {
     }
   };
 
+  const clearError = () => {
+    setError('');
+  };
+
+  const viewModeUI = getViewModeUI();
+
   const handleDragStart = (e, streamId) => {
     setDraggedStreamId(streamId);
     e.dataTransfer.effectAllowed = 'move';
@@ -336,12 +438,6 @@ const Dashboard = () => {
     setDraggedStreamId(null);
     setDragOverStreamId(null);
   };
-
-  const clearError = () => {
-    setError('');
-  };
-
-  const viewModeUI = getViewModeUI();
 
   // Render a single summary item for the mobile feed
   const renderSummaryItem = (summary) => {
@@ -587,7 +683,7 @@ const Dashboard = () => {
             <div className="grid grid-cols-12 gap-6">
               {/* Sidebar: Conditionally render in DOM based on viewMode to simplify layout management */}
               {viewMode === 'list' && (
-                <div className="col-span-12 md:col-span-3 rounded-lg shadow-sm bg-card border border-border sticky top-[69px] h-screen overflow-y-auto">
+                <div className="col-span-12 md:col-span-3 rounded-lg shadow-sm bg-card border border-border sticky top-[69px] max-h-[calc(100vh-69px)] overflow-x-hidden">
                   <div className="p-4 border-b border-border">
                     {/* Header Row */}
                     <div className="flex justify-between items-center mb-2">
@@ -610,51 +706,69 @@ const Dashboard = () => {
                         Drag to reorder
                       </div>
                     )}
+
+                    {/* Sort Toggle Button */}
+                    {!loading && topicStreams.length > 0 && (
+                      <button
+                        onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                        className="mt-2 text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full hover:bg-muted/80"
+                      >
+                        Sort by: Last Updated ({sortDirection === 'desc' ? 'Newest First' : 'Oldest First'})
+                      </button>
+                    )}
                   </div>
                   
-                  {loading ? (
-                    <div className="p-4 text-center text-muted-foreground" data-testid="loading-indicator">
-                      <p>Loading streams...</p>
-                    </div>
-                  ) : topicStreams.length === 0 ? (
-                    <div className="p-4 text-center text-muted-foreground" data-testid="empty-streams-message">
-                      <p>No topic streams yet. Create your first one!</p>
-                    </div>
-                  ) : (
-                    <ul className="divide-y divide-border" data-testid="stream-list">
-                      {topicStreams.map(stream => (
-                        <li 
-                          key={stream.id} 
-                          data-testid={`stream-item-${stream.id}`}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, stream.id)}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={(e) => handleDragOver(e, stream.id)}
-                          onDrop={(e) => handleDrop(e, stream.id)}
-                          className={`${dragOverStreamId === stream.id ? 'border-2 border-primary' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
-                        >
-                          <button
-                            className={`w-full text-left p-4 hover:bg-muted/50 flex items-center ${selectedStream?.id === stream.id ? 'bg-muted dark:bg-primary/20' : ''}`}
-                            onClick={() => setSelectedStream(stream)}
+                  {/* Scrollable content area for streams */}
+                  <div className="overflow-y-auto overflow-x-hidden flex-1">
+                    {loading ? (
+                      <div className="p-4 text-center text-muted-foreground" data-testid="loading-indicator">
+                        <p>Loading streams...</p>
+                      </div>
+                    ) : topicStreams.length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground" data-testid="empty-streams-message">
+                        <p>No topic streams yet. Create your first one!</p>
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-border" data-testid="stream-list">
+                        {topicStreams.map(stream => (
+                          <li 
+                            key={stream.id} 
+                            data-testid={`stream-item-${stream.id}`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, stream.id)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => handleDragOver(e, stream.id)}
+                            onDrop={(e) => handleDrop(e, stream.id)}
+                            className={`${dragOverStreamId === stream.id ? 'border-2 border-primary' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
                           >
-                            <div className="mr-2 cursor-move text-muted-foreground">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                              </svg>
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-medium text-foreground h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
-                                {stream.query}
+                            <button
+                              className={`w-full text-left p-4 hover:bg-muted/50 flex items-center ${selectedStream?.id === stream.id ? 'bg-muted dark:bg-primary/20' : ''}`}
+                              onClick={() => {
+                                setSelectedStream(stream);
+                                const updatedLastViewed = { ...lastViewed, [stream.id]: new Date().toISOString() };
+                                setLastViewed(updatedLastViewed);
+                                saveLastViewed(updatedLastViewed);
+                              }}
+                            >
+                              <div className="mr-2 cursor-move text-muted-foreground">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                </svg>
                               </div>
-                              <div className="text-xs text-muted-foreground mt-1">
-                                {stream.update_frequency} • {stream.detail_level}
+                              <div className="flex-1">
+                                <div className="font-medium text-foreground h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
+                                  {stream.query}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {stream.update_frequency} • {stream.detail_level}
+                                </div>
                               </div>
-                            </div>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               )}
 

@@ -324,6 +324,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
       {showEditForm ? (
         <div className="p-4 bg-card">
           <h3 className="text-lg font-medium text-foreground mb-4">Edit Topic Stream</h3>
+          <div className="text-xs text-muted-foreground mb-4">Stream ID: {stream.id}</div>
           <TopicStreamForm
             initialData={stream}
             onSubmit={handleEditSubmit}
