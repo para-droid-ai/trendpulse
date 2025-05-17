@@ -124,16 +124,16 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-3 border-b dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-between items-center">
+    <div className="flex flex-col h-full border border-border rounded-lg overflow-hidden">
+      <div className="p-3 border-b border-border bg-card flex justify-between items-center">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Follow-up Questions</h3>
-          <p className="text-xs text-gray-500 dark:text-gray-200">Ask questions to explore this topic further</p>
+          <h3 className="text-lg font-semibold text-foreground">Follow-up Questions</h3>
+          <p className="text-xs text-muted-foreground">Ask questions to explore this topic further</p>
         </div>
         {messages.length > 0 && (
           <button
             onClick={clearChat}
-            className="text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 px-2 py-1 rounded"
+            className="text-xs text-muted-foreground hover:text-destructive px-2 py-1 rounded"
           >
             Clear Chat
           </button>
@@ -142,24 +142,24 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
 
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-scroll bg-gray-50 dark:bg-gray-700 p-3"
+        className="flex-1 overflow-y-scroll bg-background p-3"
       >
         {messages.length === 0 && !loading && !error && (
-          <div className="text-center text-gray-500 dark:text-gray-400 my-6">
+          <div className="text-center text-muted-foreground my-6">
             <p>Ask a question to learn more about this topic</p>
           </div>
         )}
         
         <div className="space-y-3">
           {messages.map(message => (
-            <div key={message.id} className={`p-3 rounded-lg ${message.type==='user'?'bg-indigo-50 dark:bg-indigo-900 ml-6':'bg-white dark:bg-gray-600 mr-6'} shadow-sm`}>
+            <div key={message.id} className={`p-3 rounded-lg ${message.type==='user'?'bg-muted ml-6':'bg-card mr-6'} shadow-sm`}>
               <div className="text-sm font-medium mb-1 flex justify-between">
-                <div className="capitalize text-gray-700 dark:text-gray-200">{message.type==='user'?'You':message.model||'AI'}</div>
-                {message.type==='ai' && message.model && <div className="text-xs text-gray-500 dark:text-gray-400">Model: {message.model}</div>}
+                <div className="capitalize text-foreground">{message.type==='user'?'You':message.model||'AI'}</div>
+                {message.type==='ai' && message.model && <div className="text-xs text-muted-foreground">Model: {message.model}</div>}
               </div>
               
               {message.type==='user'
-                ? <div className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 text-sm">{message.content}</div>
+                ? <div className="whitespace-pre-wrap text-foreground text-sm">{message.content}</div>
                 : (
                   <div className="text-sm">
                     {/* Summary Content with Read More */}
@@ -169,7 +169,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
                     {message.content && message.content.length > 500 && (
                       <button
                         onClick={() => setMessages(prev => prev.map(msg => msg.id === message.id ? { ...msg, isExpanded: !msg.isExpanded } : msg))}
-                        className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                        className="mt-2 text-primary hover:underline"
                       >
                         {message.isExpanded ? 'Read less' : 'Read more'}
                       </button>
@@ -178,7 +178,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
                     {/* Summary Sources - Moved below summary content */}
                     {message.sources && message.sources.length > 0 && message.model !== 'r1-1776' && (
                       <div className="mt-4">
-                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+                        <div className="text-xs font-medium text-muted-foreground mb-1">Sources:</div>
                         <div className="flex flex-wrap gap-1">
                           {message.sources.map((src,i)=>(
                             <a 
@@ -186,7 +186,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
                               href={src} 
                               target="_blank" 
                               rel="noopener noreferrer" 
-                              className="text-xs text-indigo-600 hover:text-indigo-900 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-700 px-2 py-1 rounded-full truncate max-w-[200px]" 
+                              className="text-xs bg-accent text-accent-foreground px-2 py-1 rounded-full truncate max-w-[200px] hover:bg-accent/80"
                             >
                               {src}
                             </a>
@@ -203,8 +203,8 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
                   <button
                     onClick={() => handleSaveToStream(message)}
                     disabled={appendingId === message.id}
-                    className={`px-2 py-1 rounded text-xs text-white bg-green-600 hover:bg-green-700 ${
-                      appendingId === message.id ? 'opacity-75 cursor-not-allowed' : ''
+                    className={`px-2 py-1 rounded text-xs bg-primary text-primary-foreground hover:bg-primary/90 ${
+                      appendingId === message.id ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
                     {appendingId === message.id ? 'Adding...' : 'Save to Stream'}
@@ -217,17 +217,17 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
           {loading && (
             <div className="flex items-center justify-center my-3">
               <div className="animate-pulse flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
               </div>
             </div>
           )}
           
           {error && (
-            <div className="text-center text-red-500 dark:text-red-400 my-3 p-2 bg-red-50 dark:bg-red-900 rounded">
+            <div className="text-center text-destructive my-3 p-2 bg-destructive/10 rounded">
               {error}
-              <button onClick={() => setError('')} className="ml-2 text-xs underline">Dismiss</button>
+              <button onClick={() => setError('')} className="ml-2 text-xs underline text-destructive-foreground hover:text-destructive/80">Dismiss</button>
             </div>
           )}
           
@@ -235,7 +235,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
         </div>
       </div>
 
-      <div className="p-3 border-t dark:border-gray-700 bg-white dark:bg-gray-800">
+      <div className="p-3 border-t border-border bg-card">
         <form onSubmit={handleSubmit} className="space-y-2">
           <div className="flex">
             <input 
@@ -243,25 +243,25 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
               value={question} 
               onChange={e=>setQuestion(e.target.value)} 
               placeholder="Ask a follow-up question..." 
-              className="flex-1 border rounded-l-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400" 
+              className="flex-1 border border-border rounded-l-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground placeholder-muted-foreground" 
               disabled={loading} 
             />
             <button 
               type="submit" 
-              className={`bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-r-md ${loading?'opacity-75 cursor-not-allowed':''}`} 
+              className={`bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-r-md ${loading?'opacity-75 cursor-not-allowed':''}`}
               disabled={loading}
             >
               Send
             </button>
           </div>
           <div className="flex items-center justify-end space-x-2">
-            <label htmlFor="model-select" className="text-xs text-gray-600 dark:text-gray-400">Model:</label>
+            <label htmlFor="model-select" className="text-xs text-muted-foreground">Model:</label>
             <select 
               id="model-select"
               value={selectedModel}
               onChange={e => setSelectedModel(e.target.value)}
               disabled={loading}
-              className="text-xs border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 py-1 pl-2 pr-7"
+              className="text-xs border-border bg-background text-foreground rounded-md shadow-sm focus:border-border focus:ring focus:ring-ring py-1 pl-2 pr-7"
             >
               <option value="sonar-reasoning">Sonar Reasoning (Default)</option>
               <option value="sonar">Sonar</option>
@@ -277,12 +277,12 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
               type="checkbox"
               checked={withContext}
               onChange={e => setWithContext(e.target.checked)}
-              className="mr-2"
+              className="mr-2 accent-primary"
               disabled={loading}
             />
-            <label htmlFor="with-context-checkbox" className="text-xs text-gray-600 dark:text-gray-400 select-none">
+            <label htmlFor="with-context-checkbox" className="text-xs text-muted-foreground select-none">
               Send previous chat context
-              <span className="ml-1 text-gray-400" title="If unchecked, only your current question will be sent to the model. Previous chat history will be omitted.">(?)</span>
+              <span className="ml-1 text-muted-foreground" title="If unchecked, only your current question will be sent to the model. Previous chat history will be omitted.">(?)</span>
             </label>
           </div>
         </form>

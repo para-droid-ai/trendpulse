@@ -346,14 +346,15 @@ const Dashboard = () => {
   // Render a single summary item for the mobile feed
   const renderSummaryItem = (summary) => {
     return (
-      <div key={summary.id} className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 mb-4 p-3">
+      <div key={summary.id} className="bg-card rounded-lg shadow-sm border border-border mb-4 p-3">
         {/* Summary Header */}
-        <div className="border-b border-slate-200 dark:border-slate-700 sticky top-[69px] bg-white dark:bg-[#2a2a2e] z-10 pb-3">
+        <div className="border-b border-border sticky top-[69px] bg-card z-10 pb-3">
           <div className="flex justify-between items-start mb-2">
-            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 line-clamp-2 max-w-[80%] Camino text-ellipsis overflow-hidden" title={summary.streamQuery}>{summary.streamQuery}</h3>
+            <h3 className="text-lg font-semibold text-foreground line-clamp-2 max-w-[80%] Camino text-ellipsis overflow-hidden" title={summary.streamQuery}>{summary.streamQuery}</h3>
             {/* Combine Timestamp and Deep Dive button in a right-aligned container */}
             <div className="flex flex-col items-end flex-shrink-0">
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 font-medium">
+              {/* Time Since Last Update tag */}
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-black dark:text-white font-medium">
                 {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
               </span>
               {/* Deep Dive Chat button */}
@@ -362,7 +363,7 @@ const Dashboard = () => {
                   setShowDeepDive(true);
                   setSelectedSummary(summary);
                 }}
-                className="text-xs bg-indigo-50 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-full mt-1"
+                className="text-xs text-white px-2 py-1 rounded-full mt-1 bg-[#2ccebb] hover:opacity-90"
               >
                 Deep Dive Chat
               </button>
@@ -373,13 +374,13 @@ const Dashboard = () => {
           <div className="flex flex-wrap gap-2 items-center">
              {/* Model Badge */}
              {summary.model && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-gray-100 bg-[#4f46e5]">
                 {summary.model}
               </span>
             )}
              {/* Detail Level Badge - use stream's detail level */}
              {summary.detail_level && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-gray-100 bg-[#6366f1]">
                 {summary.detail_level}
               </span>
             )}
@@ -391,7 +392,7 @@ const Dashboard = () => {
                 const stream = topicStreams.find(s => s.id === summary.streamId);
                 if (stream) handleUpdateNow(stream.id);
               }}
-              className="text-xs py-1 px-2 bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-200 rounded-full"
+              className="text-xs py-1 px-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90"
             >
               Update
             </button>
@@ -405,7 +406,7 @@ const Dashboard = () => {
                   setSelectedStream(topicStreams[streamIndex]);
                 }
               }}
-              className="text-xs py-1 px-2 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-full"
+              className="text-xs py-1 px-2 bg-muted text-muted-foreground rounded-full hover:bg-muted/80"
             >
               View All
             </button>
@@ -414,6 +415,17 @@ const Dashboard = () => {
         
         {/* Summary Content */}
         <div className="p-4 pt-2">
+          {/* Thoughts (experimental) section */}
+          {summary.thoughts && (
+            <div className="mb-4 p-3 rounded-md bg-muted dark:bg-[#4b4a49]">
+              <div className="text-sm font-medium text-muted-foreground mb-2">
+                Thoughts (experimental)
+              </div>
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <MarkdownRenderer content={summary.thoughts} />
+              </div>
+            </div>
+          )}
           <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? '' : ''}`}>
             <MarkdownRenderer content={summary.content || ''} />
           </div>
@@ -422,7 +434,7 @@ const Dashboard = () => {
         {/* Summary Sources */}
         {summary.sources && summary.sources.length > 0 && (
           <div className="px-4 pb-4">
-            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Sources:</div>
+            <div className="text-xs font-medium text-muted-foreground mb-1">Sources:</div>
             <div className="flex flex-wrap gap-1">
               {summary.sources.map((source, index) => (
                 <a
@@ -430,7 +442,7 @@ const Dashboard = () => {
                   href={typeof source === 'string' ? source : source.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 px-2 py-1 rounded-full truncate max-w-[200px]"
+                  className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 px-2 py-1 rounded-full truncate max-w-[200px]"
                   title={typeof source === 'string' ? source : (source.url || source)}
                 >
                   {typeof source === 'string' 
@@ -446,12 +458,12 @@ const Dashboard = () => {
   };
 
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'bg-[#1c1c1e]' : 'bg-slate-100'}`}>
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className={`shadow-sm border-b ${theme === 'dark' ? 'border-slate-700 bg-[#2a2a2e]' : 'border-slate-200 bg-white'} sticky top-0 z-20 w-full`}>
+      <header className="shadow-sm border-b bg-background border-border sticky top-0 z-20 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 
-            className="text-3xl font-bold text-slate-700 dark:text-slate-300 cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+            className="text-3xl font-bold text-foreground cursor-pointer hover:text-primary transition-colors"
             onClick={() => window.location.href = '/'}
           >
             <img src="/trendpulse_logo_1.svg" alt="TrendPulse Logo" className="inline-block h-9 w-9 mr-2 align-text-bottom" />
@@ -460,21 +472,21 @@ const Dashboard = () => {
           <div className="flex items-center space-x-4">
             <button
               onClick={toggleViewMode}
-              className="mr-4 text-sm px-3 py-1 rounded bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 flex items-center"
+              className="mr-4 text-sm px-3 py-1 rounded bg-primary text-primary-foreground border border-primary/50 hover:bg-primary/90 flex items-center"
             >
               <span className="mr-1">{viewModeUI.icon}</span> {viewModeUI.text}
             </button>
             <button
               onClick={toggleTheme}
-              className="mr-4 text-sm px-3 py-1 rounded bg-gray-200 text-gray-700 border border-gray-300 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+              className="mr-4 text-sm px-3 py-1 rounded bg-muted text-muted-foreground border border-border hover:bg-muted/80"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
             </button>
-            <span className="text-xs text-gray-600 dark:text-gray-400">{user?.email}</span>
+            <span className="text-xs text-muted-foreground">{user?.email}</span>
             <button 
               onClick={logout}
-              className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-700 dark:hover:text-gray-200"
+              className="text-xs text-muted-foreground hover:text-primary"
             >
               Sign out
             </button>
@@ -486,7 +498,7 @@ const Dashboard = () => {
       <main className="py-6">
         <div className={`${viewMode === 'grid' ? 'container-fluid mx-auto' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8`}>
           {error && (
-            <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded" data-testid="error-message">
+            <div className="mb-4 bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded" data-testid="error-message">
               {error}
               <button 
                 className="float-right font-bold"
@@ -503,11 +515,11 @@ const Dashboard = () => {
               {/* Mobile View Header - moved inside the container */}
               {!showForm && topicStreams.length > 0 && !loading && !loadingSummaries && allSummaries.length > 0 ? (
                 <div className="mobile-feed pb-16 max-w-3xl mx-auto">
-                  <div className="flex justify-between items-center pt-2 pb-4 bg-[#f7f7f8] dark:bg-[#1c1c1e] z-40">
-                    <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Latest Updates</h2>
+                  <div className="flex justify-between items-center pt-2 pb-4 bg-background z-40">
+                    <h2 className="text-xl font-medium text-foreground">Latest Updates</h2>
                     <button
                       onClick={() => setShowForm(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
                     >
                       New Stream
                     </button>
@@ -520,10 +532,10 @@ const Dashboard = () => {
                 <>
                   {/* Mobile View Header - for empty states and form */}
                   <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Latest Updates</h2>
+                    <h2 className="text-xl font-medium text-foreground">Latest Updates</h2>
                     <button
                       onClick={() => setShowForm(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
                     >
                       New Stream
                     </button>
@@ -531,31 +543,31 @@ const Dashboard = () => {
 
                   {/* Mobile View Content */}
                   {loading || loadingSummaries ? (
-                    <div className="p-4 text-center text-gray-500">
+                    <div className="p-4 text-center text-muted-foreground">
                       <div className="animate-pulse flex justify-center items-center space-x-2">
-                        <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                        <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
-                        <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                        <div className="w-3 h-3 bg-primary/50 rounded-full"></div>
+                        <div className="w-3 h-3 bg-primary/50 rounded-full"></div>
+                        <div className="w-3 h-3 bg-primary/50 rounded-full"></div>
                       </div>
                       <p className="mt-2">Loading your feed...</p>
                     </div>
                   ) : topicStreams.length === 0 ? (
-                    <div className="p-8 text-center bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
-                      <p className="text-slate-500 dark:text-slate-400 mb-4">No topic streams yet. Create your first one!</p>
+                    <div className="p-8 text-center bg-card rounded-lg shadow-sm border border-border">
+                      <p className="text-muted-foreground mb-4">No topic streams yet. Create your first one!</p>
                       <button
                         onClick={() => setShowForm(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
                       >
                         New Stream
                       </button>
                     </div>
                   ) : showForm ? (
-                    <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700">
+                    <div className="bg-card rounded-lg shadow-sm p-6 border border-border">
                       <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Create New Topic Stream</h2>
+                        <h2 className="text-xl font-medium text-foreground">Create New Topic Stream</h2>
                         <button
                           onClick={() => setShowForm(false)}
-                          className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                          className="text-muted-foreground hover:text-foreground"
                         >
                           Cancel
                         </button>
@@ -563,9 +575,9 @@ const Dashboard = () => {
                       <TopicStreamForm onSubmit={handleCreateStream} />
                     </div>
                   ) : allSummaries.length === 0 ? (
-                    <div className="p-8 text-center bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
-                      <p className="text-slate-500 dark:text-slate-400 mb-4">No updates in your feed yet.</p>
-                      <p className="text-slate-500 dark:text-slate-400 mb-4">Try updating one of your streams to see content here.</p>
+                    <div className="p-8 text-center bg-card rounded-lg shadow-sm border border-border">
+                      <p className="text-muted-foreground mb-4">No updates in your feed yet.</p>
+                      <p className="text-muted-foreground mb-4">Try updating one of your streams to see content here.</p>
                     </div>
                   ) : null}
                 </>
@@ -575,14 +587,14 @@ const Dashboard = () => {
             <div className="grid grid-cols-12 gap-6">
               {/* Sidebar: Conditionally render in DOM based on viewMode to simplify layout management */}
               {viewMode === 'list' && (
-                <div className={`col-span-12 md:col-span-3 rounded-lg shadow-sm ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200 shadow-md'} sticky top-[69px] h-screen overflow-y-auto`}>
-                  <div className={`p-4 border-b ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
+                <div className="col-span-12 md:col-span-3 rounded-lg shadow-sm bg-card border border-border sticky top-[69px] h-screen overflow-y-auto">
+                  <div className="p-4 border-b border-border">
                     {/* Header Row */}
                     <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
+                      <h2 className="text-lg font-medium text-foreground">Topic Streams</h2>
                       <button
                         onClick={() => setShowForm(true)}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 px-3 py-1 rounded text-sm border border-slate-300 dark:border-slate-600"
+                        className="bg-muted hover:bg-muted/80 text-foreground px-3 py-1 rounded text-sm border border-border"
                         data-testid="new-stream-button"
                       >
                         New Stream
@@ -591,7 +603,7 @@ const Dashboard = () => {
                     
                     {/* Drag to reorder text below header row */}
                     {!loading && topicStreams.length > 0 && (
-                      <div className="text-xs text-slate-500 dark:text-slate-400 italic flex items-center mt-2">
+                      <div className="text-xs text-muted-foreground italic flex items-center mt-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                         </svg>
@@ -601,15 +613,15 @@ const Dashboard = () => {
                   </div>
                   
                   {loading ? (
-                    <div className="p-4 text-center text-gray-500" data-testid="loading-indicator">
+                    <div className="p-4 text-center text-muted-foreground" data-testid="loading-indicator">
                       <p>Loading streams...</p>
                     </div>
                   ) : topicStreams.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500" data-testid="empty-streams-message">
+                    <div className="p-4 text-center text-muted-foreground" data-testid="empty-streams-message">
                       <p>No topic streams yet. Create your first one!</p>
                     </div>
                   ) : (
-                    <ul className="divide-y divide-slate-200 dark:divide-slate-700" data-testid="stream-list">
+                    <ul className="divide-y divide-border" data-testid="stream-list">
                       {topicStreams.map(stream => (
                         <li 
                           key={stream.id} 
@@ -619,22 +631,22 @@ const Dashboard = () => {
                           onDragEnd={handleDragEnd}
                           onDragOver={(e) => handleDragOver(e, stream.id)}
                           onDrop={(e) => handleDrop(e, stream.id)}
-                          className={`${dragOverStreamId === stream.id ? 'border-2 border-blue-400 dark:border-blue-600' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
+                          className={`${dragOverStreamId === stream.id ? 'border-2 border-primary' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
                         >
                           <button
-                            className={`w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center ${selectedStream?.id === stream.id ? 'bg-slate-200 dark:bg-slate-600 border-l-4 border-slate-500 dark:border-slate-400' : ''}`}
+                            className={`w-full text-left p-4 hover:bg-muted/50 flex items-center ${selectedStream?.id === stream.id ? 'bg-muted dark:bg-primary/20' : ''}`}
                             onClick={() => setSelectedStream(stream)}
                           >
-                            <div className="mr-2 cursor-move text-slate-400 dark:text-slate-500">
+                            <div className="mr-2 cursor-move text-muted-foreground">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
                               </svg>
                             </div>
                             <div className="flex-1">
-                              <div className="font-medium text-slate-700 dark:text-slate-300 h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
+                              <div className="font-medium text-foreground h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
                                 {stream.query}
                               </div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              <div className="text-xs text-muted-foreground mt-1">
                                 {stream.update_frequency} • {stream.detail_level}
                               </div>
                             </div>
@@ -649,12 +661,12 @@ const Dashboard = () => {
               {/* Main content area */}
               <div className={`${viewMode === 'list' ? 'col-span-12 md:col-span-9' : 'col-span-12'}`}>
                 {showForm ? (
-                  <div className={`rounded-lg shadow-sm p-6 ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200'}`}>
+                  <div className="rounded-lg shadow-sm p-6 bg-card border border-border">
                     <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-medium text-slate-700 dark:text-slate-300">Create New Topic Stream</h2>
+                      <h2 className="text-xl font-medium text-foreground">Create New Topic Stream</h2>
                       <button
                         onClick={() => setShowForm(false)}
-                        className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                        className="text-muted-foreground hover:text-foreground"
                       >
                         Cancel
                       </button>
@@ -680,8 +692,8 @@ const Dashboard = () => {
                     {/* Render remaining streams if there are more than 5 */}
                     {topicStreams.length > 5 && (
                       <>
-                        <div className="col-span-full border-t border-gray-200 dark:border-gray-700 py-4 mb-4">
-                          <h3 className="text-md font-medium text-gray-700 dark:text-gray-300">More Streams</h3>
+                        <div className="col-span-full border-t border-border py-4 mb-4">
+                          <h3 className="text-md font-medium text-foreground">More Streams</h3>
                         </div>
                         {topicStreams.slice(5).map(stream => (
                           <div key={stream.id}>
@@ -698,8 +710,8 @@ const Dashboard = () => {
                     )}
                     
                     {topicStreams.length === 0 && !loading && (
-                      <div className={`col-span-full rounded-lg shadow-sm p-6 text-center ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <p className="text-slate-500 dark:text-slate-400">
+                      <div className="col-span-full rounded-lg shadow-sm p-6 text-center bg-card border border-border">
+                        <p className="text-muted-foreground">
                           No topic streams available to display in grid view.
                         </p>
                       </div>
@@ -713,8 +725,8 @@ const Dashboard = () => {
                     isGridView={false} 
                   />
                 ) : viewMode === 'list' ? (
-                  <div className={`rounded-lg shadow-sm p-6 text-center ${theme === 'dark' ? 'bg-[#2a2a2e] border-slate-700' : 'bg-white border-slate-200'}`}>
-                    <p className="text-slate-500 dark:text-slate-400">
+                  <div className="rounded-lg shadow-sm p-6 text-center bg-card border border-border">
+                    <p className="text-muted-foreground">
                       Select a topic stream or create a new one to get started
                     </p>
                   </div>
@@ -727,26 +739,26 @@ const Dashboard = () => {
 
       {/* Loading overlay for delete operation */}
       {isDeleting && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" data-testid="deleting-overlay">
-          <div className="bg-white dark:bg-[#2a2a2e] rounded-lg p-4 shadow-xl">
-            <p className="text-slate-700 dark:text-slate-200">Deleting topic stream...</p>
+        <div className="fixed inset-0 bg-background/75 flex items-center justify-center z-50" data-testid="deleting-overlay">
+          <div className="bg-card rounded-lg p-4 shadow-xl">
+            <p className="text-foreground">Deleting topic stream...</p>
           </div>
         </div>
       )}
 
       {showDeepDive && selectedSummary && (
-        <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" style={{ maxWidth: '1000px !important' }}>
-            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+        <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center">
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" style={{ maxWidth: '1000px !important' }}>
+            <div className="p-4 border-b border-border flex justify-between items-center">
               {/* Truncated Stream Title */}
               <div className="flex-1 overflow-hidden min-w-0 mr-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300 truncate">
+                <h3 className="text-lg font-medium text-foreground truncate">
                   Deep Dive: {selectedStream.query}
                 </h3>
               </div>
               <button
                 onClick={() => setShowDeepDive(false)}
-                className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -758,16 +770,16 @@ const Dashboard = () => {
             <div className="flex overflow-hidden flex-row w-full">
 
               {/* Original Summary Section - Left Column */}
-              <div className="p-4 border-r dark:border-gray-700 overflow-y-auto flex-grow basis-0">
-                <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Original Summary</h4>
+              <div className="p-4 border-r border-border overflow-y-auto flex-grow basis-0">
+                <h4 className="text-md font-medium text-foreground mb-2">Original Summary</h4>
                 {/* Render summary with potential truncation and Read More - Keep as is for now */}
-                <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? '' : ''}`}>
+                <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? 'line-clamp-10' : ''}`}>
                     <MarkdownRenderer content={selectedSummary.content} />
                 </div>
               </div>
 
               {/* Deep Dive Chat Section - Right Column */}
-              <div className="p-4 border-l dark:border-gray-700 overflow-y-auto flex-grow basis-0">
+              <div className="p-4 border-l border-border overflow-y-auto flex-grow basis-0">
                  <DeepDiveChat 
                     topicStreamId={selectedStream.id} 
                     summaryId={selectedSummary.id}

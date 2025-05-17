@@ -82,6 +82,7 @@ class TopicStreamCreate(BaseModel):
     model_type: str       # Will be converted to ModelType
     recency_filter: str
     system_prompt: Optional[str] = None
+    temperature: float = 0.7 # Add temperature with default
 
 class TopicStreamResponse(BaseModel):
     id: int
@@ -92,6 +93,7 @@ class TopicStreamResponse(BaseModel):
     recency_filter: str
     last_updated: Optional[datetime]
     system_prompt: Optional[str] = None
+    temperature: float # Add temperature to response model
     
     class Config:
         orm_mode = True
@@ -224,59 +226,47 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
             prev_summary_content = most_recent_summary.content
             logger.debug(f"Found previous summary (ID: {most_recent_summary.id}) with {len(prev_summary_content)} chars")
         
-        # Use the model type from the topic stream
+        # Use the model type and detail level from the topic stream
         model = topic_stream.model_type.value
         logger.debug(f"Using model from topic stream: {model}")
 
-        # Use custom system prompt if provided
-        if hasattr(topic_stream, 'system_prompt') and topic_stream.system_prompt:
-            full_query = topic_stream.system_prompt
+        # Modify query based on detail level and whether this is an update
+        query_prefix = ""
+        # The detailed query prefix logic is now handled by the backend model logic based on detail_level
+        # We can keep the original query or modify slightly if needed for focus.
+        # Let's revert to using the original query unless it's an update.
+        
+        # Original query from topic stream
+        base_query = topic_stream.query
+
+        # If this is an update (not the first summary), specifically ask for new information
+        if prev_summary_content:
+            full_query = f"Provide ONLY NEW information about {base_query} that wasn't in the previous summary. Focus on recent developments, news, and updates."
         else:
-            # Modify query based on detail level and whether this is an update
-            query_prefix = ""
-            if topic_stream.detail_level == DetailLevel.BRIEF:
-                query_prefix = "Give a brief summary of "
-            elif topic_stream.detail_level == DetailLevel.DETAILED:
-                query_prefix = "Give a detailed analysis of "
+             # For the initial search, just use the base query
+             full_query = base_query
 
-            full_query = f"{query_prefix}{topic_stream.query}"
+        # Use recency filter from topic stream
+        recency_filter = topic_stream.recency_filter
 
-            # If this is an update (not the first summary), specifically ask for new information
-            if prev_summary_content:
-                full_query = f"Provide ONLY NEW information about {topic_stream.query} that wasn't in the previous summary. Focus on recent developments, news, and updates."
+        # Add instruction to format in markdown
+        full_query += ". Format your response using markdown for better readability."
 
-            if topic_stream.recency_filter != "all_time":
-                full_query += f" focusing on information from {topic_stream.recency_filter}"
-
-            # Add instruction to format in markdown
-            full_query += ". Format your response using markdown for better readability."
-
-            # If this is an update, add instruction to avoid repeating information
-            if prev_summary_content:
-                full_query += " DO NOT repeat information that was already covered previously."
+        # If this is an update, add instruction to avoid repeating information
+        if prev_summary_content:
+            full_query += " DO NOT repeat information that was already covered previously."
         
         logger.debug(f"Sending query to Perplexity API: {full_query}")
-        
-        # Determine max_tokens based on detail_level
-        if topic_stream.detail_level == DetailLevel.COMPREHENSIVE or topic_stream.detail_level == DetailLevel.DETAILED:
-            max_tokens_for_api = 8000
-            logger.debug(f"Using max_tokens: {max_tokens_for_api} for DETAILED/COMPREHENSIVE level")
-        elif topic_stream.detail_level == DetailLevel.BRIEF:
-            max_tokens_for_api = 1500 
-            logger.debug(f"Using max_tokens: {max_tokens_for_api} for BRIEF level")
-        else: # Default fallback, though ideally all cases are handled
-            max_tokens_for_api = 1000
-            logger.debug(f"Using default max_tokens: {max_tokens_for_api}")
 
         # API call with detailed error handling
         try:
             result = await perplexity_api.search_perplexity(
                 query=full_query,
                 model=model,
-                recency_filter=topic_stream.recency_filter,
-                previous_summary=prev_summary_content,  # Pass the previous summary for context
-                temperature=0.2,
-                max_tokens=max_tokens_for_api # Use dynamic max_tokens
+                recency_filter=recency_filter,
+                previous_summary=prev_summary_content,
+                temperature=topic_stream.temperature,
+                detail_level=topic_stream.detail_level.value # Pass the detail level value
             )
             logger.debug(f"API call successful, received response of {len(str(result))} characters")
         except Exception as api_error:
@@ -428,7 +418,8 @@ async def create_topic_stream(
             detail_level=detail_lvl,
             model_type=model,
             recency_filter=topic_stream.recency_filter,
-            system_prompt=topic_stream.system_prompt
+            system_prompt=topic_stream.system_prompt,
+            temperature=topic_stream.temperature
         )
         
         logger.debug("Created TopicStream object")
@@ -695,7 +686,7 @@ async def deep_dive(
             query=contextual_question, 
             model=model_to_use, 
             recency_filter="all_time",
-            temperature=0.2, 
+            temperature=topic_stream.temperature,
             max_tokens=1000 # Using 1000 as per previous attempt, can be adjusted
         )
     except Exception as e:
@@ -848,6 +839,7 @@ async def update_topic_stream(
         db_topic_stream.model_type = model
         db_topic_stream.recency_filter = topic_stream.recency_filter
         db_topic_stream.system_prompt = topic_stream.system_prompt
+        db_topic_stream.temperature = topic_stream.temperature
         
         db.commit()
         db.refresh(db_topic_stream)

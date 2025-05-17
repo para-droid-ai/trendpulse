@@ -235,7 +235,8 @@ class PerplexityAPI:
                           recency_filter: str = "1d", # Use internal format here
                           max_tokens: int = 512,
                           temperature: float = 0.7,
-                          previous_summary: Optional[str] = None
+                          previous_summary: Optional[str] = None,
+                          detail_level: str = "Detailed"
                           ) -> Dict[str, Any]:
                           
         # Map internal recency filter format to Perplexity API format
@@ -253,16 +254,58 @@ class PerplexityAPI:
              # For now, let's assume omitting it is fine or the API handles `None` gracefully.
              pass 
 
-        # Determine timeout based on model
+        # Separate mappings for reasoning and non-reasoning models' max_tokens
+        detail_map_context = {
+            "brief": {"search_context_size": "low"},
+            "detailed": {"search_context_size": "medium"},
+            "comprehensive": {"search_context_size": "high"},
+        }
+
+        detail_map_max_tokens = {
+            # Max tokens for non-reasoning models
+            "non_reasoning": {
+                "brief": 512,
+                "detailed": 850,
+                "comprehensive": 1200,
+            },
+            # Max tokens for reasoning models (to account for thinking tokens)
+            "reasoning": {
+                "brief": 2500,
+                "detailed": 5000,
+                "comprehensive": 8000,
+            },
+        }
+
+        # Get detail_level configurations
+        # Use the lowercase detail_level directly for lookup
+        detail_level_context_config = detail_map_context.get(detail_level, detail_map_context["detailed"])
+
+        # Determine if the model is a reasoning model (include r1-1776)
+        is_reasoning_model = model in ["sonar-reasoning", "sonar-reasoning-pro", "sonar-deep-research", "r1-1776"]
+
+        # Get the correct max_tokens mapping based on model type
+        max_tokens_mapping = detail_map_max_tokens["reasoning"] if is_reasoning_model else detail_map_max_tokens["non_reasoning"]
+
+        # Get the effective max_tokens based on detail level and model type
+        # Use the lowercase detail_level directly for lookup
+        effective_max_tokens = max_tokens_mapping.get(detail_level, max_tokens_mapping["detailed"])
+
+        # Get the effective search_context_size based on detail level
+        effective_search_context_size = detail_level_context_config["search_context_size"]
+
+        # Add debug logging to show determined parameters
+        logger.debug(f"Determined API parameters for detail_level '{detail_level}' and model '{model}': max_tokens={effective_max_tokens}, search_context_size='{effective_search_context_size}'")
+
+        # Determine timeout based on model (keeping previous logic for deep-research)
         current_timeout_seconds = 120 # Default to 120 seconds
         if model == "sonar-deep-research":
             current_timeout_seconds = 2400 # 40 minutes for deep research
             logger.info(f"Using extended timeout for sonar-deep-research: {current_timeout_seconds}s")
-        
+
         payload = {
             "model": model,
             "messages": self._prepare_messages(query, previous_summary),
-            "max_tokens": max_tokens,
+            "max_tokens": effective_max_tokens, # Use dynamically determined max_tokens
             "temperature": temperature,
         }
         
@@ -271,7 +314,8 @@ class PerplexityAPI:
         if model != "r1-1776":
             logger.info(f"Using model {model} with web search enabled")
             payload["web_search_options"] = {
-                "search_context_size": "high" # Use high for better results by default
+                # Use effective_search_context_size based on detail level
+                "search_context_size": effective_search_context_size 
             }
         else:
             logger.info(f"Using R1-1776 offline model - web search DISABLED")

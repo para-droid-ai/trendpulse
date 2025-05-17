@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import MaskedSection from './MaskedSection';
 
 function extractThinkSections(content) {
@@ -25,11 +26,14 @@ export default function MarkdownRenderer({ content }) {
     <div className="prose prose-sm sm:prose lg:prose-lg xl:prose-xl max-w-none dark:prose-invert prose-p:my-2 prose-h1:mt-3 prose-h1:mb-2 prose-h2:mt-3 prose-h2:mb-2 prose-h3:mt-2 prose-h3:mb-1">
       {sections.map((section, i) =>
         section.type === 'think' ? (
-          <MaskedSection key={i}>{section.value}</MaskedSection>
+          <div key={i} className="not-prose my-4">
+            <MaskedSection>{section.value}</MaskedSection>
+          </div>
         ) : (
           <ReactMarkdown
             key={i}
             remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
             components={{
               h1: ({node, ...props}) => <h2 {...props} />,
               h2: ({node, ...props}) => <h2 {...props} />,
