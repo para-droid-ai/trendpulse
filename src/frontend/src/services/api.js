@@ -157,6 +157,13 @@ export const topicStreamAPI = {
     }
   },
   
+  getById: async (id) => {
+    return retryRequest(async () => {
+      const response = await api.get(`/topic-streams/${id}`);
+      return response.data;
+    });
+  },
+  
   getSummaries: async (id) => {
     return retryRequest(async () => {
       const response = await api.get(`/topic-streams/${id}/summaries/`);

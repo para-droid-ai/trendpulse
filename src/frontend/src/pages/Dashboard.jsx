@@ -31,6 +31,7 @@ const Dashboard = () => {
   const [lastViewed, setLastViewed] = useState({}); // State to hold last viewed timestamps { streamId: timestamp }
   const [sortBy, setSortBy] = useState('last_updated'); // 'last_updated'
   const [sortDirection, setSortDirection] = useState('desc'); // 'asc' or 'desc'
+  const [sortMode, setSortMode] = useState('manual'); // 'manual' or 'last_updated'
   
   // Function to toggle between view modes
   const toggleViewMode = () => {
@@ -117,47 +118,55 @@ const Dashboard = () => {
   };
 
   // Load ordered streams based on saved order (now used as secondary sort)
-  const getOrderedStreams = (streams, primarySortBy, primarySortDirection) => {
+  const getOrderedStreams = (streams, currentSortMode, currentSortBy, currentSortDirection) => {
     try {
       const savedOrder = localStorage.getItem('streamOrder');
       const orderMap = savedOrder ? JSON.parse(savedOrder) : {};
 
       // Create a copy of streams to sort
       return [...streams].sort((a, b) => {
-        // Primary sort by last_updated
+        // Get timestamps or default to epoch for consistent sorting
         const dateA = a.last_updated ? new Date(a.last_updated) : new Date(0);
         const dateB = b.last_updated ? new Date(b.last_updated) : new Date(0);
 
-        let primarySortResult = 0;
-        if (primarySortBy === 'last_updated') {
-            if (primarySortDirection === 'desc') {
-                primarySortResult = dateB.getTime() - dateA.getTime();
-            } else {
-                primarySortResult = dateA.getTime() - dateB.getTime();
-            }
-        }
+        // Get manual order indices or default to Infinity
+        const orderA = orderMap[a.id] !== undefined ? orderMap[a.id] : Infinity;
+        const orderB = orderMap[b.id] !== undefined ? orderMap[b.id] : Infinity;
 
-        // If primary sort results are the same, use localStorage order as secondary sort
-        if (primarySortResult === 0) {
-            const orderA = orderMap[a.id] !== undefined ? orderMap[a.id] : Infinity;
-            const orderB = orderMap[b.id] !== undefined ? orderMap[b.id] : Infinity;
-            return orderA - orderB; // Always sort manual order ascending
-        }
+        if (currentSortMode === 'last_updated') {
+          // Primary sort by last_updated
+          let primarySortResult = 0;
+          if (currentSortDirection === 'desc') {
+              primarySortResult = dateB.getTime() - dateA.getTime();
+          } else {
+              primarySortResult = dateA.getTime() - dateB.getTime();
+          }
 
-        return primarySortResult;
+          // Secondary sort by manual order if last_updated is the same
+          if (primarySortResult === 0) {
+              return orderA - orderB; // Always sort manual order ascending within same update time
+          }
+          return primarySortResult;
+
+        } else { // 'manual' sort mode
+          // Primary sort by manual order
+          const manualSortResult = orderA - orderB;
+
+          // Secondary sort by last_updated descending if manual order is the same (or both don't have manual order)
+          if (manualSortResult === 0) {
+             return dateB.getTime() - dateA.getTime(); // Newest first as secondary
+          }
+          return manualSortResult;
+        }
       });
     } catch (err) {
       console.error('Failed to load stream order for sorting:', err);
-      // Fallback to sorting only by last_updated if localStorage fails
-      return [...streams].sort((a, b) => {
-         const dateA = a.last_updated ? new Date(a.last_updated) : new Date(0);
-         const dateB = b.last_updated ? new Date(b.last_updated) : new Date(0);
-         if (primarySortDirection === 'desc') {
-            return dateB.getTime() - dateA.getTime();
-         } else {
-            return dateA.getTime() - dateB.getTime();
-         }
-      });
+      // Fallback to sorting only by last_updated descending if localStorage fails
+       return [...streams].sort((a, b) => {
+           const dateA = a.last_updated ? new Date(a.last_updated) : new Date(0);
+           const dateB = b.last_updated ? new Date(b.last_updated) : new Date(0);
+           return dateB.getTime() - dateA.getTime(); // Default to newest first
+       });
     }
   };
 
@@ -193,8 +202,8 @@ const Dashboard = () => {
           throw new Error("Invalid data format received from API.");
       }
       console.log(`Setting ${data.length} topic streams.`);
-      // Apply primary sort (last_updated) and secondary sort (localStorage order) to the streams
-      const orderedStreams = getOrderedStreams(data, sortBy, sortDirection);
+      // Apply sorting based on the current sort mode and direction
+      const orderedStreams = getOrderedStreams(data, sortMode, sortBy, sortDirection);
       // Filter out any potentially invalid stream objects before setting state
       const validStreams = orderedStreams.filter(stream => stream && stream.id !== undefined && stream.id !== null);
 
@@ -213,7 +222,7 @@ const Dashboard = () => {
             console.log("Detected stale stream IDs in localStorage order. Clearing streamOrder.");
             localStorage.removeItem('streamOrder');
             // Re-fetch and re-order based on the now-cleared localStorage (will just use backend order)
-            const reOrderedStreams = getOrderedStreams(data, sortBy, sortDirection);
+            const reOrderedStreams = getOrderedStreams(data, sortMode, sortBy, sortDirection);
             // Add an explicit filter to remove known problematic stream IDs (1, 2, 11)
             const finalStreams = reOrderedStreams.filter(stream => ![1, 2, 11].includes(stream.id));
             setTopicStreams(finalStreams);
@@ -250,7 +259,7 @@ const Dashboard = () => {
       setLoading(false);
       console.log("fetchTopicStreams finished.");
     }
-  }, [selectedStream, sortBy, sortDirection]); // Added sortBy and sortDirection to dependency array
+  }, [selectedStream, sortMode, sortBy, sortDirection]); // Added sortMode to dependency array
 
   // Load last viewed timestamps on component mount
   useEffect(() => {
@@ -342,32 +351,54 @@ const Dashboard = () => {
     }
   };
 
-  const handleUpdateNow = async (streamId) => {
+  const handleUpdateNow = async (id) => {
     try {
-      setError('');
-      const newSummary = await topicStreamAPI.updateNow(streamId);
+      console.log(`Calling update-now API for stream ${id}`);
+      const newSummary = await topicStreamAPI.updateNow(id);
+      console.log(`Update-now API successful for stream ${id}`);
       
-      // Find the stream to get its query
-      const stream = topicStreams.find(s => s.id === streamId);
+      // Find the stream to get its query (no longer needed for query, but for updating the stream object)
+      // const stream = topicStreams.find(s => s.id === id);
       
       if (newSummary.content && newSummary.content.includes("No new information is available")) {
         setError('No new information is available since the last update.');
       } else {
-        // Add the new summary to the combined list
+        // Add the new summary to the combined list (keeping this for mobile view feed)
         setAllSummaries(prev => [
           {
             ...newSummary,
-            streamQuery: stream?.query || '',
-            streamId: streamId,
+            streamQuery: topicStreams.find(s => s.id === id)?.query || '', // Get query from state
+            streamId: id,
           },
           ...prev
         ]);
       }
       
-      return newSummary;
+      // Fetch the updated stream object to get the latest last_updated timestamp
+      const updatedStream = await topicStreamAPI.getById(id);
+
+      // Update the topicStreams state with the fetched updated stream object
+      setTopicStreams(prevStreams => {
+          const streamsCopy = [...prevStreams];
+          const streamIndex = streamsCopy.findIndex(s => s.id === id);
+          if (streamIndex > -1) {
+              streamsCopy[streamIndex] = updatedStream; // Replace with the fetched updated stream
+          }
+          // Re-sort the streams based on the current sort mode and direction
+          const sortedStreams = getOrderedStreams(streamsCopy, sortMode, sortBy, sortDirection);
+          // Apply the filter for problematic IDs just in case
+          return sortedStreams.filter(stream => ![1, 2, 11].includes(stream.id));
+      });
+
+      return newSummary; // Return the new summary if needed downstream
+
     } catch (err) {
-      console.error('Failed to update stream:', err);
-      setError(err.message || 'Failed to update stream. Please try again.');
+      console.error(`Update now error for ID ${id}:`, err);
+      if (err.response) {
+        setError(err.response.data?.detail || err.message || 'Failed to update stream. Please try again.');
+      } else {
+        setError(err.message || 'Failed to update stream. Please try again.');
+      }
       throw err;
     }
   };
@@ -710,10 +741,19 @@ const Dashboard = () => {
                     {/* Sort Toggle Button */}
                     {!loading && topicStreams.length > 0 && (
                       <button
-                        onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
+                        onClick={() => {
+                           if (sortMode === 'manual') {
+                              setSortMode('last_updated');
+                              setSortDirection('desc'); // Default to newest first when switching to last_updated sort
+                           } else if (sortDirection === 'desc') {
+                              setSortDirection('asc'); // Toggle direction if already sorting by last_updated
+                           } else {
+                              setSortMode('manual'); // Switch back to manual if already oldest first
+                           }
+                        }}
                         className="mt-2 text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full hover:bg-muted/80"
                       >
-                        Sort by: Last Updated ({sortDirection === 'desc' ? 'Newest First' : 'Oldest First'})
+                        Sort by: {sortMode === 'manual' ? 'Manual Order' : `Last Updated (${sortDirection === 'desc' ? 'Newest First' : 'Oldest First'})`}
                       </button>
                     )}
                   </div>
