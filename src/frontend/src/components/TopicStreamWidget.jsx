@@ -73,11 +73,30 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   // State for deleting the WHOLE stream (keep existing)
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
 
+  // State for token count
+  const [totalTokens, setTotalTokens] = useState(0);
+
   const theme = useTheme();
 
   useEffect(() => {
     fetchSummaries();
   }, [stream.id]);
+
+  useEffect(() => {
+    calculateTotalTokens();
+  }, [summaries]);
+
+  const calculateTotalTokens = () => {
+    // Simple estimation: roughly 1 token per 4 characters
+    // A more accurate method would use a proper tokenizer library
+    const estimatedTokens = summaries.reduce((sum, summary) => {
+      // Add content length and thoughts length
+      const contentTokens = summary.content ? Math.ceil(summary.content.length / 4) : 0;
+      const thoughtsTokens = summary.thoughts ? Math.ceil(summary.thoughts.length / 4) : 0;
+      return sum + contentTokens + thoughtsTokens;
+    }, 0);
+    setTotalTokens(estimatedTokens);
+  };
 
   const fetchSummaries = async () => {
     try {
@@ -420,79 +439,97 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                )}
             </div>
 
+            {/* Token count for List View - Below buttons, inside header, right aligned */}
+            {!isGridView && (totalTokens > 0 || !loading) && (
+              <div className="flex justify-end mt-2"> {/* Container to align tag to the right */}
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
+                  Estimated Stream Tokens: {totalTokens}
+                </span>
+              </div>
+            )}
+
             {/* Action buttons for grid view, placed below title/tags */}
             {isGridView && (
-              <div className="flex space-x-1 items-center justify-end mt-2"> {/* Show only in grid view, aligned right below header */}
-                {/* Edit Button */}
-                <button
-                  onClick={handleEdit}
-                  className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
-                  title="Edit Stream"
-                >
-                   {/* Pencil Icon */}
-                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                   </svg>
-                 </button>
+              <div className="flex items-center justify-between mt-2 w-full"> {/* Container for token counter and buttons */} 
+                {/* Token count for Grid View - Left aligned */}
+                {(totalTokens > 0 || !loading) && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
+                    Estimated Stream Tokens: {totalTokens}
+                  </span>
+                )}
+                {/* Action Buttons for Grid View - Right aligned */} 
+                <div className="flex space-x-1 items-center flex-shrink-0"> {/* Container for the buttons */}
+                   {/* Edit Button */}
+                   <button
+                     onClick={handleEdit}
+                     className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                     title="Edit Stream"
+                   >
+                      {/* Pencil Icon */}
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                      </svg>
+                    </button>
 
-                 {/* Update Now Button */}
-                 <button
-                   onClick={handleUpdateNow}
-                   disabled={updating}
-                   className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                   title={updating ? 'Updating...' : 'Update Now'}
-                 >
-                    {/* Using SVG file from public folder */}
-                    <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
-                 </button>
+                    {/* Update Now Button */}
+                    <button
+                      onClick={handleUpdateNow}
+                      disabled={updating}
+                      className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={updating ? 'Updating...' : 'Update Now'}
+                    >
+                       {/* Using SVG file from public folder */}
+                       <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
+                    </button>
 
-                 {/* Delete Button */}
-                 <button
-                   onClick={handleDeleteStream}
-                   className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                   title="Delete Stream"
-                 >
-                    {/* Using trashcan SVG file from public folder */}
-                    <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
-                 </button>
+                    {/* Delete Button */}
+                    <button
+                      onClick={handleDeleteStream}
+                      className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                      title="Delete Stream"
+                    >
+                       {/* Using trashcan SVG file from public folder */}
+                       <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
+                    </button>
 
-                 {/* Export Button */}
-                 <button
-                   onClick={() => setShowExportOptions(!showExportOptions)}
-                   className="py-1 px-2 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors text-xs"
-                 >
-                   Export
-                 </button>
+                    {/* Export Button */}
+                    <button
+                      onClick={() => setShowExportOptions(!showExportOptions)}
+                      className="py-1 px-2 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors text-xs"
+                    >
+                      Export
+                    </button>
 
-                 {/* Export Options Dropdown */}
-                 {showExportOptions && (
-                   <div className="absolute right-0 top-full mt-1 w-48 bg-popover rounded-md shadow-lg z-10"> {/* Position relative to button */}
-                     <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                       <button
-                         onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
-                         className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                         role="menuitem"
-                       >
-                         Copy to Clipboard
-                       </button>
-                       <button
-                         onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
-                         className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                         role="menuitem"
-                       >
-                         Export as .md
-                       </button>
-                       <button
-                         onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
-                         className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                         role="menuitem"
-                       >
-                         Export as .txt
-                       </button>
-                     </div>
-                   </div>
-                 )}
-               </div>
+                    {/* Export Options Dropdown */}
+                    {showExportOptions && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-popover rounded-md shadow-lg z-10"> {/* Position relative to button */}
+                        <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                          <button
+                            onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
+                            className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
+                            role="menuitem"
+                          >
+                            Copy to Clipboard
+                          </button>
+                          <button
+                            onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
+                            className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
+                            role="menuitem"
+                          >
+                            Export as .md
+                          </button>
+                          <button
+                            onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
+                            className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
+                            role="menuitem"
+                          >
+                            Export as .txt
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </div>
             )}
           </div>
 
@@ -589,7 +626,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
           {showDeepDive && selectedSummary && (
             <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center p-4">
-              <div className="bg-card rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="bg-card rounded-lg shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col max-w-7xl">
                 <div className="p-4 border-b border-border flex justify-between items-center">
                   <h3 className="text-lg font-medium text-foreground truncate flex-1 min-w-0">
                     Deep Dive: {stream.query}
@@ -608,7 +645,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                 <div className="flex flex-1 overflow-hidden flex-row">
                   {/* Original Summary Section - Left Column */}
                   <div className="flex-1 basis-1/2 p-4 border-r border-border overflow-y-auto">
-                    <h4 className="text-md font-medium text-foreground mb-2">Summary</h4>
+                    <h4 className="text-md font-medium text-foreground mb-2">Original Summary</h4>
                     <div className="text-sm text-muted-foreground mb-2">
                       {selectedSummary.created_at ? formatInTimeZone(toZonedTime(parseISO(selectedSummary.created_at), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : ''} • Model: {selectedSummary.model_type}
                     </div>
