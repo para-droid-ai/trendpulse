@@ -748,7 +748,7 @@ const Dashboard = () => {
 
       {showDeepDive && selectedSummary && (
         <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center">
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" style={{ maxWidth: '1000px !important' }}>
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" style={{ maxWidth: '1200px' }}>
             <div className="p-4 border-b border-border flex justify-between items-center">
               {/* Truncated Stream Title */}
               <div className="flex-1 overflow-hidden min-w-0 mr-4">
@@ -770,7 +770,7 @@ const Dashboard = () => {
             <div className="flex overflow-hidden flex-row w-full">
 
               {/* Original Summary Section - Left Column */}
-              <div className="p-4 border-r border-border overflow-y-auto flex-grow basis-0">
+              <div className="p-4 border-r border-border overflow-y-auto flex-1">
                 <h4 className="text-md font-medium text-foreground mb-2">Original Summary</h4>
                 {/* Render summary with potential truncation and Read More - Keep as is for now */}
                 <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? 'line-clamp-10' : ''}`}>
@@ -779,7 +779,7 @@ const Dashboard = () => {
               </div>
 
               {/* Deep Dive Chat Section - Right Column */}
-              <div className="p-4 border-l border-border overflow-y-auto flex-grow basis-0">
+              <div className="p-4 border-l border-border overflow-y-auto flex-3">
                  <DeepDiveChat 
                     topicStreamId={selectedStream.id} 
                     summaryId={selectedSummary.id}
