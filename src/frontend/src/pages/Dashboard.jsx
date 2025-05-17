@@ -596,6 +596,25 @@ const Dashboard = () => {
             <img src="/trendpulse_logo_1.svg" alt="TrendPulse Logo" className="inline-block h-9 w-9 mr-2 align-text-bottom" />
             TrendPulse Dashboard
           </h1>
+          {/* Down arrow button to scroll to More Streams - only show in grid view if there are more than 5 streams */}
+          {viewMode === 'grid' && topicStreams.length > 5 && !loading && (
+            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
+              <button
+                onClick={() => {
+                const element = document.getElementById('more-streams-section');
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                }
+                }}
+                className="p-2 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-colors shadow-md"
+                title="Scroll to More Streams"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </button>
+            </div>
+          )}
           <div className="flex items-center space-x-4">
             <button
               onClick={toggleViewMode}
@@ -843,10 +862,30 @@ const Dashboard = () => {
                       ))}
                     </div>
                     
+                    {/* Button to scroll to More Streams - only show if there are more than 5 streams */}
+                    {topicStreams.length > 5 && (
+                      <div className="col-span-full text-center mb-4">
+                        <button
+                          onClick={() => {
+                            const element = document.getElementById('more-streams-section');
+                            if (element) {
+                              element.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }}
+                          className="p-2 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                          title="Scroll to More Streams"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                    
                     {/* Render remaining streams if there are more than 5 */}
                     {topicStreams.length > 5 && (
                       <>
-                        <div className="col-span-full border-t border-border py-4 mb-4">
+                        <div id="more-streams-section" className="col-span-full border-t border-border py-4 mb-4">
                           <h3 className="text-md font-medium text-foreground">More Streams</h3>
                         </div>
                         {topicStreams.slice(5).map(stream => (

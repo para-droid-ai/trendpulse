@@ -3,14 +3,11 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState('light');
-
-  useEffect(() => {
-    // Read theme from localStorage on mount, default to light
+  // Read theme from localStorage during initial state setup
+  const [theme, setTheme] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
-    const initialTheme = savedTheme || 'light';
-    setTheme(initialTheme);
-  }, []); // Run only on mount
+    return savedTheme || 'light';
+  });
 
   useEffect(() => {
     // Remove both classes first to ensure correct state

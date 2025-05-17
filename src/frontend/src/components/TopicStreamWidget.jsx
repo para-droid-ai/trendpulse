@@ -551,7 +551,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               </div>
             ) : (
               summaries.map((summary) => (
-                <div key={summary.id} className="p-4">
+                <div key={summary.id} className="p-2">
                   <h4 className="text-md font-medium text-foreground mb-2">Summary</h4>
                   {/* Timestamp, Model, and Summary Actions */}
                   <div className="flex flex-wrap gap-2 items-center mb-2">
@@ -565,7 +565,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     )}
 
                     {/* Summary Actions - Deep Dive Chat and Delete */}
-                    <div className="flex space-x-2 items-center ml-auto"> {/* Added ml-auto to push to the right */}
+                    <div className="flex space-x-2 items-center ml-auto pr-1"> {/* Added ml-auto to push to the right */}
                        <button
                         onClick={() => handleDeepDive(summary)}
                         className="text-xs p-1 rounded-md text-white bg-[#2ccebb] hover:opacity-90 transition-colors"
@@ -582,25 +582,28 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                       />
                     </div>
                   </div>
-                  <div className={`prose prose-sm max-w-none dark:prose-invert`}>
-                    {/* Thoughts (experimental) section for this summary - Conditional rendering */}
+                  {/* Summary Content */}
+                  <div className="px-2 py-1">
+                    {/* Thoughts (experimental) section */}
                     {summary.thoughts && (
-                      <div className="mb-4 p-3 rounded-md border border-border text-foreground text-sm whitespace-pre-line bg-muted dark-thoughts-mask-bg"> {/* Removed bg-card class */}
+                      <div className="mb-4 p-3 rounded-md bg-muted dark:bg-[#4b4a49]">
                         <div className="text-sm font-medium text-muted-foreground mb-2">
                           Thoughts (experimental)
                         </div>
-                        <div className="prose prose-sm max-w-none dark:prose-invert"> {/* Markdown rendering for thoughts content */}
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
                           <MarkdownRenderer content={summary.thoughts} />
                         </div>
                       </div>
                     )}
-                    {/* Main summary content */}
-                    <MarkdownRenderer content={summary.content} />
+                    {/* Removed truncation class and logic */}
+                    <div className={`prose prose-sm max-w-none dark:prose-invert px-2`}>
+                      <MarkdownRenderer content={summary.content || ''} />
+                    </div>
                   </div>
 
                   {/* Summary Sources */}
                   {summary.sources && summary.sources.length > 0 && (
-                    <div className="mt-3">
+                    <div className="px-2 pb-2">
                       <div className="text-xs font-medium text-muted-foreground mb-1">Sources:</div>
                       <div className="flex flex-wrap gap-1">
                         {summary.sources.map((source, index) => (
