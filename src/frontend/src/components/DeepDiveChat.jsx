@@ -31,6 +31,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   const [appendingId, setAppendingId] = useState(null);
   const [selectedModel, setSelectedModel] = useState('sonar-reasoning'); // Default model
   const [withContext, setWithContext] = useState(true);
+  const [temperature, setTemperature] = useState(0.4); // Add state for temperature, default 0.4
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
@@ -56,7 +57,21 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   }, [messages]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent default form submission initially
+    // The actual submit logic will be triggered by onKeyDown for Enter key
+    // Ctrl+Enter will handle new lines
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) { // Regular Enter without Shift or Ctrl
+      e.preventDefault(); // Prevent default behavior (which might be inserting a newline in some contexts)
+      handleSubmitLogic(); // Call the actual submission logic
+    } else if (e.key === 'Enter' && e.shiftKey) { // Shift+Enter for newline
+      // Allow default behavior (insert newline)
+    }
+  };
+  
+  const handleSubmitLogic = async () => {
     if (!question.trim()) return;
     const userMessage = { id: Date.now(), type: 'user', content: question };
     setMessages(prev => [...prev, userMessage]);
@@ -65,12 +80,16 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
     try {
       // Only send previous messages if withContext is true
       let contextMessages = withContext ? messages : [];
+      
+      // Add a marker to emphasize the user's question
+      const emphasizedQuestion = `#### USER QUESTION: ${question}`;
+
       const response = await deepDiveAPI.askQuestion(
         topicStreamId,
         summaryId,
-        question,
+        emphasizedQuestion, // Send the emphasized question
         selectedModel,
-        { withContext, contextMessages }
+        { withContext, contextMessages, temperature } // Include temperature in options
       );
       
       // Format the response content based on the model type
@@ -124,7 +143,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   };
 
   return (
-    <div className="flex flex-col h-full border border-border rounded-lg overflow-hidden max-w-3xl mx-auto">
+    <div className="flex flex-col h-full border border-border rounded-lg overflow-hidden">
       <div className="p-3 border-b border-border bg-card flex justify-between items-center">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Follow-up Questions</h3>
@@ -242,6 +261,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
               type="text" 
               value={question} 
               onChange={e=>setQuestion(e.target.value)} 
+              onKeyDown={handleKeyDown}
               placeholder="Ask a follow-up question..." 
               className="flex-1 border border-border rounded-l-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground placeholder-muted-foreground" 
               disabled={loading} 
@@ -270,6 +290,22 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
               <option value="sonar-deep-research">Sonar Deep Research</option>
               <option value="r1-1776">R1-1776 (Offline)</option>
             </select>
+          </div>
+          {/* Temperature Slider */}
+          <div className="flex items-center justify-end space-x-2">
+            <label htmlFor="temperature-slider" className="text-xs text-muted-foreground">Temperature:</label>
+            <input
+              id="temperature-slider"
+              type="range"
+              min="0" // Minimum temperature
+              max="1" // Maximum temperature
+              step="0.01" // Step value for finer control
+              value={temperature}
+              onChange={e => setTemperature(parseFloat(e.target.value))}
+              disabled={loading}
+              className="w-32"
+            />
+            <span className="text-xs text-muted-foreground w-8 text-right">{temperature.toFixed(2)}</span> {/* Display current temperature */}
           </div>
           <div className="flex items-center mt-2">
             <input
