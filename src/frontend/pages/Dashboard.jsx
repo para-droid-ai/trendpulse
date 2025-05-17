@@ -534,76 +534,78 @@ const Dashboard = () => {
             <div className="grid grid-cols-12 gap-6">
               {/* Sidebar: Conditionally render in DOM based on viewMode to simplify layout management */}
               {viewMode === 'list' && (
-                <div className="col-span-12 md:col-span-3 bg-[#f0f0f1] dark:bg-[#2a2a2e] rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
-                  <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                    <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
-                    <div className="flex space-x-2">
-                      {!loading && topicStreams.length > 0 && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 italic flex items-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                          </svg>
-                          Drag to reorder
-                        </div>
-                      )}
-                      <button
-                        onClick={() => setShowForm(true)}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 px-3 py-1 rounded text-sm border border-slate-300 dark:border-slate-600"
-                        data-testid="new-stream-button"
-                      >
-                        New Stream
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {loading ? (
-                    <div className="p-4 text-center text-gray-500" data-testid="loading-indicator">
-                      <p>Loading streams...</p>
-                    </div>
-                  ) : topicStreams.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500" data-testid="empty-streams-message">
-                      <p>No topic streams yet. Create your first one!</p>
-                    </div>
-                  ) : (
-                    <ul className="divide-y divide-slate-200 dark:divide-slate-700" data-testid="stream-list">
-                      {topicStreams.map(stream => (
-                        <li 
-                          key={stream.id} 
-                          data-testid={`stream-item-${stream.id}`}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, stream.id)}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={(e) => handleDragOver(e, stream.id)}
-                          onDrop={(e) => handleDrop(e, stream.id)}
-                          className={`${dragOverStreamId === stream.id ? 'border-2 border-blue-400 dark:border-blue-600' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
+                <div className="col-span-12 md:col-span-2 rounded-lg shadow-sm bg-card border border-border sticky top-[69px] h-screen overflow-y-auto">
+                  <div className="p-4 border-b border-border">
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                      <h2 className="text-lg font-medium text-slate-700 dark:text-slate-300">Topic Streams</h2>
+                      <div className="flex space-x-2">
+                        {!loading && topicStreams.length > 0 && (
+                          <div className="text-xs text-slate-500 dark:text-slate-400 italic flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                            Drag to reorder
+                          </div>
+                        )}
+                        <button
+                          onClick={() => setShowForm(true)}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 px-3 py-1 rounded text-sm border border-slate-300 dark:border-slate-600"
+                          data-testid="new-stream-button"
                         >
-                          <button
-                            className={`w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center ${selectedStream?.id === stream.id ? 'bg-slate-200 dark:bg-slate-600 border-l-4 border-slate-500 dark:border-slate-400' : ''}`}
-                            onClick={() => setSelectedStream(stream)}
+                          New Stream
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {loading ? (
+                      <div className="p-4 text-center text-gray-500" data-testid="loading-indicator">
+                        <p>Loading streams...</p>
+                      </div>
+                    ) : topicStreams.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500" data-testid="empty-streams-message">
+                        <p>No topic streams yet. Create your first one!</p>
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-slate-200 dark:divide-slate-700" data-testid="stream-list">
+                        {topicStreams.map(stream => (
+                          <li 
+                            key={stream.id} 
+                            data-testid={`stream-item-${stream.id}`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, stream.id)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => handleDragOver(e, stream.id)}
+                            onDrop={(e) => handleDrop(e, stream.id)}
+                            className={`${dragOverStreamId === stream.id ? 'border-2 border-blue-400 dark:border-blue-600' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
                           >
-                            <div className="mr-2 cursor-move text-slate-400 dark:text-slate-500">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                              </svg>
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-medium text-slate-700 dark:text-slate-300 h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
-                                {stream.query}
+                            <button
+                              className={`w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center ${selectedStream?.id === stream.id ? 'bg-slate-200 dark:bg-slate-600 border-l-4 border-slate-500 dark:border-slate-400' : ''}`}
+                              onClick={() => setSelectedStream(stream)}
+                            >
+                              <div className="mr-2 cursor-move text-slate-400 dark:text-slate-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                </svg>
                               </div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                {stream.update_frequency} • {stream.detail_level}
+                              <div className="flex-1">
+                                <div className="font-medium text-slate-700 dark:text-slate-300 h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
+                                  {stream.query}
+                                </div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                  {stream.update_frequency} • {stream.detail_level}
+                                </div>
                               </div>
-                            </div>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* Main content area */}
-              <div className={`${viewMode === 'list' ? 'col-span-12 md:col-span-9' : 'col-span-12'}`}>
+              <div className={`${viewMode === 'list' ? 'col-span-12 md:col-span-10' : 'col-span-12'}`}>
                 {showForm ? (
                   <div className="bg-white dark:bg-[#2a2a2e] rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700" data-testid="stream-form-container">
                     <div className="flex justify-between items-center mb-6">
@@ -688,7 +690,9 @@ const Dashboard = () => {
 
       {showDeepDive && selectedSummary && (
         <div className="fixed inset-0 z-50 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Increased width using viewport width and adjusted internal layout */}
+          {/* Using w-[99vw] for 99% viewport width and a 1:3 flex split for summary/chat */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-[99vw] max-h-[95vh] overflow-hidden flex flex-col">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
               {/* Truncated Stream Title */}
               <div className="flex-1 overflow-hidden">
@@ -706,11 +710,12 @@ const Dashboard = () => {
               </button>
             </div>
 
-            {/* Main content area with two columns */}
+            {/* Main content area with two columns - Adjusted column widths using flex */}
+            {/* Summary takes 1/4 width, Chat takes 3/4 width */}
             <div className="flex flex-1 overflow-hidden">
 
-              {/* Original Summary Section - Left Column */}
-              <div className="w-1/2 p-4 border-r dark:border-gray-700 overflow-y-auto">
+              {/* Original Summary Section - Left Column - Set to 1/4 width */}
+              <div className="w-1/4 p-4 border-r dark:border-gray-700 overflow-y-auto">
                 <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Original Summary</h4>
                 {/* Render summary with potential truncation and Read More - Keep as is for now */}
                 <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? '' : ''}`}> {/* Removed line-clamp, summary should be fully visible */}
@@ -739,8 +744,8 @@ const Dashboard = () => {
                 )}
               </div>
 
-              {/* Deep Dive Chat Section - Right Column */}
-              <div className="flex-1 overflow-hidden">
+              {/* Deep Dive Chat Section - Right Column - Set to 3/4 width */}
+              <div className="w-3/4 overflow-hidden">
                 <DeepDiveChat 
                   topicStreamId={selectedStream.id}
                   summaryId={selectedSummary.id}

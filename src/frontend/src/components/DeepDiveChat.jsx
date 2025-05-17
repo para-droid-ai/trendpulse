@@ -124,7 +124,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   };
 
   return (
-    <div className="flex flex-col h-full border border-border rounded-lg overflow-hidden">
+    <div className="flex flex-col h-full border border-border rounded-lg overflow-hidden max-w-3xl mx-auto">
       <div className="p-3 border-b border-border bg-card flex justify-between items-center">
         <div>
           <h3 className="text-lg font-semibold text-foreground">Follow-up Questions</h3>
@@ -163,7 +163,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
                 : (
                   <div className="text-sm">
                     {/* Summary Content with Read More */}
-                    <div className={`prose prose-sm max-w-none dark:prose-invert overflow-hidden ${!message.isExpanded ? 'line-clamp-10' : ''}`}>
+                    <div className={`dark:prose-invert overflow-hidden ${!message.isExpanded ? 'line-clamp-10' : ''}`}>
                       <MarkdownRenderer content={message.content} />
                     </div>
                     {message.content && message.content.length > 500 && (

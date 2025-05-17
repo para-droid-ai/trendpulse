@@ -103,7 +103,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   };
 
   return (
-    <div className="border rounded-lg shadow-sm dark:border-gray-700">
+    <div className="border rounded-lg shadow-sm dark:border-gray-700 max-w-3xl">
       <div className="p-4 border-b dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-between items-center">
         <div>
           <h3 className="text-lg font-medium text-gray-900 dark:text-blue-300">Follow-up Questions</h3>
@@ -134,7 +134,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`p-4 rounded-lg max-w-prose ${
+            className={`p-4 rounded-lg ${
               message.type === 'user'
                 ? 'bg-indigo-50 dark:bg-indigo-900 ml-6'
                 : 'bg-gray-200 dark:bg-gray-600 mr-6'
