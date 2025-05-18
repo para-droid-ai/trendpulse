@@ -76,9 +76,6 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   // State for token count
   const [totalStoredEstTokens, setTotalStoredEstTokens] = useState(stream.total_stored_est_tokens || 0);
 
-  // State for override checkbox
-  const [ignorePreviousForThisUpdateOverride, setIgnorePreviousForThisUpdateOverride] = useState(false);
-
   const theme = useTheme();
 
   useEffect(() => {
@@ -115,17 +112,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
       setUpdating(true);
       setError('');
 
-      const options = { 
-          ignore_all_previous_summaries_override: ignorePreviousForThisUpdateOverride 
-      };
-      const newSummary = await topicStreamAPI.updateNow(stream.id, options);
+      const newSummary = await topicStreamAPI.updateNow(stream.id);
 
       if (newSummary.content && newSummary.content.includes("No new information is available")) {
         setError('No new information is available since the last update.');
       } else {
         setSummaries([newSummary, ...summaries]);
       }
-      setIgnorePreviousForThisUpdateOverride(false); // Reset override after use
     } catch (err) {
       console.error('Failed to update stream:', err);
       setError(err.message || 'Failed to update stream. Please try again.');
@@ -726,20 +719,6 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               {copyFeedback}
             </div>
           )}
-
-          {/* In the header section of TopicStreamWidget, after other buttons */}
-          <div className="mt-2 flex items-center self-start w-full"> {/* self-start to align left if in a flex container */}
-              <input
-                  type="checkbox"
-                  id={`ignore-previous-override-${stream.id}`}
-                  checked={ignorePreviousForThisUpdateOverride}
-                  onChange={(e) => setIgnorePreviousForThisUpdateOverride(e.target.checked)}
-                  className="h-3.5 w-3.5 text-primary focus:ring-ring border-border rounded mr-1.5 accent-primary"
-              />
-              <label htmlFor={`ignore-previous-override-${stream.id}`} className="text-xs text-muted-foreground">
-                  Force fresh update (ignore stream's context setting for this time)
-              </label>
-          </div>
         </>
       )}
     </div>
