@@ -62,16 +62,22 @@ class PerplexityAPI:
         
         self.request_timestamps.append(current_time)
 
-    def _prepare_messages(self, query: str, previous_summary: Optional[str] = None) -> List[Dict]:
+    def _prepare_messages(self, query: str, previous_summary: Optional[str] = None, custom_system_prompt: Optional[str] = None) -> List[Dict]:
         """
         Prepare the messages array for the API call.
         The Perplexity API requires roles to alternate between user and assistant
         after any optional system messages.
         """
+        # Define the default system content
+        default_system_content = "You are a helpful assistant that summarizes recent information about the user\'s query. Focus on developments and news from the specified time period. Present the key findings clearly and concisely, citing sources. Please format your response using markdown for better readability. Use markdown formatting for headings, lists, links, emphasis, and any code snippets or tables. Include citations with proper markdown hyperlinks."
+
+        # Use custom_system_prompt if provided and not empty, otherwise use default
+        system_content_to_use = custom_system_prompt if custom_system_prompt else default_system_content
+
         messages = [
             {
                 "role": "system",
-                "content": "You are a helpful assistant that summarizes recent information about the user's query. Focus on developments and news from the specified time period. Present the key findings clearly and concisely, citing sources. Please format your response using markdown for better readability. Use markdown formatting for headings, lists, links, emphasis, and any code snippets or tables. Include citations with proper markdown hyperlinks."
+                "content": system_content_to_use # Use the determined system content
             }
         ]
         
@@ -230,13 +236,15 @@ class PerplexityAPI:
             raise APIProcessingError(error_msg)
 
     async def search_perplexity(self,
-                          query: str,
+                          query: Optional[str],
                           model: str = "sonar",
-                          recency_filter: str = "1d", # Use internal format here
+                          recency_filter: str = "1d",
                           max_tokens: int = 512,
                           temperature: float = 0.7,
                           previous_summary: Optional[str] = None,
-                          detail_level: str = "Detailed"
+                          detail_level: str = "detailed",
+                          messages_override: Optional[List[Dict[str, Any]]] = None,
+                          custom_system_prompt: Optional[str] = None
                           ) -> Dict[str, Any]:
                           
         # Map internal recency filter format to Perplexity API format
@@ -302,10 +310,18 @@ class PerplexityAPI:
             current_timeout_seconds = 2400 # 40 minutes for deep research
             logger.info(f"Using extended timeout for sonar-deep-research: {current_timeout_seconds}s")
 
+        if messages_override is not None:
+            processed_messages = messages_override
+        elif query is not None:
+            # Pass custom_system_prompt to _prepare_messages
+            processed_messages = self._prepare_messages(query, previous_summary, custom_system_prompt=custom_system_prompt)
+        else:
+            raise ValueError("Either 'query' or 'messages_override' must be provided to search_perplexity.")
+
         payload = {
             "model": model,
-            "messages": self._prepare_messages(query, previous_summary),
-            "max_tokens": effective_max_tokens, # Use dynamically determined max_tokens
+            "messages": processed_messages,
+            "max_tokens": effective_max_tokens,
             "temperature": temperature,
         }
         

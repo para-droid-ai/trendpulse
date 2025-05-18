@@ -213,7 +213,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
 # Helper function to perform a search and create a summary
 async def perform_search_and_create_summary(db: Session, topic_stream: TopicStream):
     try:
-        logger.debug(f"Performing search for topic stream: {topic_stream.query}")
+        logger.debug(f"Performing search for topic stream: {topic_stream.query} (ID: {topic_stream.id})")
         perplexity_api = PerplexityAPI()
         
         # Get the most recent summary for this topic stream, if any
@@ -256,8 +256,16 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
         if prev_summary_content:
             full_query += " DO NOT repeat information that was already covered previously."
         
-        logger.debug(f"Sending query to Perplexity API: {full_query}")
-
+        # Retrieve the custom system prompt from the TopicStream object
+        stream_custom_system_prompt = topic_stream.system_prompt
+        # stream_custom_system_prompt will be None if not set in the DB
+        
+        logger.debug(f"For stream {topic_stream.id} - Query to API: {full_query}")
+        if stream_custom_system_prompt:
+            logger.debug(f"For stream {topic_stream.id} - Using custom system prompt: \'{stream_custom_system_prompt[:100]}...\'")
+        else:
+            logger.debug(f"For stream {topic_stream.id} - No custom system prompt, PerplexityAPI will use default.")
+        
         # API call with detailed error handling
         try:
             result = await perplexity_api.search_perplexity(
@@ -266,7 +274,8 @@ async def perform_search_and_create_summary(db: Session, topic_stream: TopicStre
                 recency_filter=recency_filter,
                 previous_summary=prev_summary_content,
                 temperature=topic_stream.temperature,
-                detail_level=topic_stream.detail_level.value # Pass the detail level value
+                detail_level=topic_stream.detail_level.value,
+                custom_system_prompt=stream_custom_system_prompt  # <-- PASS THE CUSTOM PROMPT
             )
             logger.debug(f"API call successful, received response of {len(str(result))} characters")
         except Exception as api_error:
@@ -670,6 +679,21 @@ async def deep_dive(
 
     perplexity_api = PerplexityAPI()
     
+    messages_for_perplexity = []
+
+    # Use the topic stream's custom system prompt if available, otherwise a default for chat
+    deep_dive_system_content = topic_stream.system_prompt
+    if not deep_dive_system_content:
+        deep_dive_system_content = f"You are a helpful AI assistant. The user is exploring the topic: \'{topic_stream.query}\'. Answer their questions clearly and concisely. Format your response using markdown."
+
+    messages_for_perplexity.append({
+        "role": "system",
+        "content": deep_dive_system_content
+    })
+
+    # Conditionally add initial stream summary context
+    # This logic is adjusted to only add summary if include_stream_summary_context is true AND it's the first message (no chat_history)
+
     contextual_question = (
         f"Regarding the topic \"{topic_stream.query}\" and the following summary:\n\n"
         f"Summary: {summary.content}\n\n"
@@ -681,13 +705,13 @@ async def deep_dive(
     logger.info(f"Deep Dive - Using model: {model_to_use}") # Changed to INFO for easier spotting
 
     try:
-        # *** THIS IS THE CRITICAL PART - Ensure it calls search_perplexity ***
         result = await perplexity_api.search_perplexity(
-            query=contextual_question, 
-            model=model_to_use, 
+            query=None, # messages_override is used
+            model=model_to_use,
             recency_filter="all_time",
+            messages_override=messages_for_perplexity, # Pass the fully constructed messages
             temperature=topic_stream.temperature,
-            max_tokens=1000 # Using 1000 as per previous attempt, can be adjusted
+            detail_level=topic_stream.detail_level.value # For max_tokens hint
         )
     except Exception as e:
         logger.error(f"Error during Perplexity API call in deep_dive: {str(e)}", exc_info=True)
