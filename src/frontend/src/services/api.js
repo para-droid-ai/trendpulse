@@ -171,20 +171,19 @@ export const topicStreamAPI = {
     });
   },
   
-  updateNow: async (id) => {
+  updateNow: async (id, options = { ignore_all_previous_summaries_override: false }) => {
     try {
-      console.log(`Calling update-now API for stream ${id}`);
-      const response = await api.post(`/topic-streams/${id}/update-now`);
+      console.log(`Calling update-now API for stream ${id} with options:`, options);
+      // Ensure 'options' is sent as the request body for the POST request
+      const response = await api.post(`/topic-streams/${id}/update-now`, options); 
       console.log(`Update-now API successful for stream ${id}`);
       return response.data;
     } catch (error) {
       console.error(`Update now error for ID ${id}:`, error);
       if (error.response) {
-        // The request was made and the server responded with a status code outside of 2xx
         console.error(`Server error response:`, error.response.data);
         console.error(`Status code: ${error.response.status}`);
       } else if (error.request) {
-        // The request was made but no response was received
         console.error(`No response received:`, error.request);
       }
       throw error;

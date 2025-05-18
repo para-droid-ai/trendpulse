@@ -74,7 +74,10 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
 
   // State for token count
-  const [totalTokens, setTotalTokens] = useState(0);
+  const [totalStoredEstTokens, setTotalStoredEstTokens] = useState(0);
+
+  // State for override checkbox
+  const [ignorePreviousForThisUpdateOverride, setIgnorePreviousForThisUpdateOverride] = useState(false);
 
   const theme = useTheme();
 
@@ -83,20 +86,14 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   }, [stream.id]);
 
   useEffect(() => {
-    calculateTotalTokens();
+    // Calculate total estimated content tokens from fetched summaries
+    if (summaries && summaries.length > 0) {
+        const sumOfEstTokens = summaries.reduce((acc, s) => acc + (s.estimated_content_tokens || 0), 0);
+        setTotalStoredEstTokens(sumOfEstTokens);
+    } else {
+        setTotalStoredEstTokens(0);
+    }
   }, [summaries]);
-
-  const calculateTotalTokens = () => {
-    // Simple estimation: roughly 1 token per 4 characters
-    // A more accurate method would use a proper tokenizer library
-    const estimatedTokens = summaries.reduce((sum, summary) => {
-      // Add content length and thoughts length
-      const contentTokens = summary.content ? Math.ceil(summary.content.length / 4) : 0;
-      const thoughtsTokens = summary.thoughts ? Math.ceil(summary.thoughts.length / 4) : 0;
-      return sum + contentTokens + thoughtsTokens;
-    }, 0);
-    setTotalTokens(estimatedTokens);
-  };
 
   const fetchSummaries = async () => {
     try {
@@ -123,13 +120,17 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
       setUpdating(true);
       setError('');
 
-      const newSummary = await topicStreamAPI.updateNow(stream.id);
+      const options = { 
+          ignore_all_previous_summaries_override: ignorePreviousForThisUpdateOverride 
+      };
+      const newSummary = await topicStreamAPI.updateNow(stream.id, options);
 
       if (newSummary.content && newSummary.content.includes("No new information is available")) {
         setError('No new information is available since the last update.');
       } else {
         setSummaries([newSummary, ...summaries]);
       }
+      setIgnorePreviousForThisUpdateOverride(false); // Reset override after use
     } catch (err) {
       console.error('Failed to update stream:', err);
       setError(err.message || 'Failed to update stream. Please try again.');
@@ -441,10 +442,10 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             </div>
 
             {/* Token count for List View - Below buttons, inside header, right aligned */}
-            {!isGridView && (totalTokens > 0 || !loading) && (
+            {!isGridView && (totalStoredEstTokens > 0 || !loading) && (
               <div className="flex justify-end mt-2"> {/* Container to align tag to the right */}
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
-                  Estimated Stream Tokens: {totalTokens}
+                  Estimated Stream Tokens: {totalStoredEstTokens}
                 </span>
               </div>
             )}
@@ -453,9 +454,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             {isGridView && (
               <div className="flex items-center justify-between mt-2 w-full"> {/* Container for token counter and buttons */} 
                 {/* Token count for Grid View - Left aligned */}
-                {(totalTokens > 0 || !loading) && (
+                {(totalStoredEstTokens > 0 || !loading) && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
-                    Estimated Stream Tokens: {totalTokens}
+                    Estimated Stream Tokens: {totalStoredEstTokens}
                   </span>
                 )}
                 {/* Action Buttons for Grid View - Right aligned */} 
@@ -623,6 +624,20 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                       </div>
                     </div>
                   )}
+
+                  {(summary.prompt_tokens !== null || summary.completion_tokens !== null || summary.total_tokens !== null) && (
+                    <div className="mt-1 px-2 text-xs text-muted-foreground/80">
+                      API Usage:
+                      {summary.prompt_tokens !== null && ` P: ${summary.prompt_tokens}`}
+                      {summary.completion_tokens !== null && ` | C: ${summary.completion_tokens}`}
+                      {summary.total_tokens !== null && ` | Total: ${summary.total_tokens} tokens`}
+                    </div>
+                  )}
+                  {summary.estimated_content_tokens !== null && (
+                    <div className="mt-0.5 px-2 text-xs text-muted-foreground/70">
+                      (Content Est: {summary.estimated_content_tokens} tokens)
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -714,6 +729,20 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               {copyFeedback}
             </div>
           )}
+
+          {/* In the header section of TopicStreamWidget, after other buttons */}
+          <div className="mt-2 flex items-center self-start w-full"> {/* self-start to align left if in a flex container */}
+              <input
+                  type="checkbox"
+                  id={`ignore-previous-override-${stream.id}`}
+                  checked={ignorePreviousForThisUpdateOverride}
+                  onChange={(e) => setIgnorePreviousForThisUpdateOverride(e.target.checked)}
+                  className="h-3.5 w-3.5 text-primary focus:ring-ring border-border rounded mr-1.5 accent-primary"
+              />
+              <label htmlFor={`ignore-previous-override-${stream.id}`} className="text-xs text-muted-foreground">
+                  Force fresh update (ignore stream's context setting for this time)
+              </label>
+          </div>
         </>
       )}
     </div>

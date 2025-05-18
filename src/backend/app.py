@@ -17,20 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import json
 import asyncio
 import re
-
-# Add the src directory to Python path
-src_path = str(Path(__file__).parent.parent)
-if src_path not in sys.path:
-    sys.path.append(src_path)
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-# Load environment variables
-load_dotenv()
-
-from models import Base, User, TopicStream, Summary, UpdateFrequency, DetailLevel, ModelType
+from utils.tokenizer_utils import count_tokens, truncate_text_by_tokens
+from models import Base, User, TopicStream, Summary, UpdateFrequency, DetailLevel, ModelType, ContextHistoryLevel
 # Temporarily comment out the scheduler import to avoid the dependency error
 # from scheduler import TopicStreamScheduler
 from perplexity_api import PerplexityAPI
@@ -66,6 +54,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
 # Pydantic models
 class UserCreate(BaseModel):
     email: EmailStr
@@ -77,12 +69,13 @@ class UserResponse(BaseModel):
 
 class TopicStreamCreate(BaseModel):
     query: str
-    update_frequency: str  # Will be converted to UpdateFrequency
-    detail_level: str     # Will be converted to DetailLevel
-    model_type: str       # Will be converted to ModelType
+    update_frequency: str
+    detail_level: str
+    model_type: str
     recency_filter: str
     system_prompt: Optional[str] = None
-    temperature: float = 0.7 # Add temperature with default
+    temperature: float = 0.7
+    context_history_level: Optional[str] = ContextHistoryLevel.LAST_ONE.value
 
 class TopicStreamResponse(BaseModel):
     id: int
@@ -93,7 +86,8 @@ class TopicStreamResponse(BaseModel):
     recency_filter: str
     last_updated: Optional[datetime]
     system_prompt: Optional[str] = None
-    temperature: float # Add temperature to response model
+    temperature: float
+    context_history_level: str
     
     class Config:
         orm_mode = True
@@ -115,6 +109,10 @@ class SummaryResponse(BaseModel):
     sources: List[str]
     created_at: datetime
     model: str = ""
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    estimated_content_tokens: Optional[int] = None
 
 class SummaryCreate(BaseModel):
     content: str
@@ -129,6 +127,12 @@ class DeepDiveResponse(BaseModel):
     answer: str
     sources: List[str]
     model: str
+
+class UpdateNowOptions(BaseModel):
+    ignore_all_previous_summaries_override: Optional[bool] = False
+
+# Define this constant near the top of app.py or in a config file
+MAX_PREV_CONTEXT_TOKENS_SMART_LIMIT = 20000 # Example: Approx 20k tokens for history
 
 # Helper function to convert model objects to dict with proper enum handling
 def model_to_dict(obj):
@@ -211,125 +215,153 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         )
 
 # Helper function to perform a search and create a summary
-async def perform_search_and_create_summary(db: Session, topic_stream: TopicStream):
+async def perform_search_and_create_summary(
+    db: Session,
+    topic_stream: models.TopicStream,
+    ignore_all_previous_summaries_override: bool = False
+):
     try:
-        logger.debug(f"Performing search for topic stream: {topic_stream.query} (ID: {topic_stream.id})")
+        logger.info(f"Performing search for stream ID: {topic_stream.id}. Override ignore all: {ignore_all_previous_summaries_override}")
         perplexity_api = PerplexityAPI()
-        
-        # Get the most recent summary for this topic stream, if any
-        most_recent_summary = db.query(Summary).filter(
-            Summary.topic_stream_id == topic_stream.id
-        ).order_by(Summary.created_at.desc()).first()
-        
-        prev_summary_content = None
-        if most_recent_summary:
-            prev_summary_content = most_recent_summary.content
-            logger.debug(f"Found previous summary (ID: {most_recent_summary.id}) with {len(prev_summary_content)} chars")
-        
-        # Use the model type and detail level from the topic stream
-        model = topic_stream.model_type.value
-        logger.debug(f"Using model from topic stream: {model}")
 
-        # Modify query based on detail level and whether this is an update
-        query_prefix = ""
-        # The detailed query prefix logic is now handled by the backend model logic based on detail_level
-        # We can keep the original query or modify slightly if needed for focus.
-        # Let's revert to using the original query unless it's an update.
-        
-        # Original query from topic stream
+        prev_summaries_concatenated_content = None
+        num_summaries_to_fetch = 0 # Renamed for clarity
+
+        if ignore_all_previous_summaries_override:
+            logger.info(f"Stream {topic_stream.id}: Manual override ON. Ignoring all previous summaries for this update.")
+            # num_summaries_to_fetch remains 0
+        else:
+            history_level_setting = topic_stream.context_history_level
+            if history_level_setting == ContextHistoryLevel.NONE:
+                num_summaries_to_fetch = 0
+            elif history_level_setting == ContextHistoryLevel.LAST_ONE:
+                num_summaries_to_fetch = 1
+            elif history_level_setting == ContextHistoryLevel.LAST_THREE:
+                num_summaries_to_fetch = 3
+            elif history_level_setting == ContextHistoryLevel.LAST_FIVE:
+                num_summaries_to_fetch = 5
+            elif history_level_setting == ContextHistoryLevel.ALL_SMART_LIMIT:
+                num_summaries_to_fetch = 15 # Max to fetch before token-based truncation
+
+            logger.info(f"Stream {topic_stream.id}: Configured to include up to {num_summaries_to_fetch} (level: {history_level_setting.value}) previous summaries.")
+
+        if num_summaries_to_fetch > 0:
+            # Fetch summaries (content and creation date), newest first
+            recent_summaries_from_db = db.query(models.Summary.content, models.Summary.created_at).filter(
+                models.Summary.topic_stream_id == topic_stream.id
+            ).order_by(models.Summary.created_at.desc()).limit(num_summaries_to_fetch).all()
+
+            if recent_summaries_from_db:
+                # Reverse to process oldest first for concatenation to build chronological context
+                summaries_content_chronological = [data.content for data in reversed(recent_summaries_from_db)]
+
+                concatenated_parts = []
+                current_total_tokens_for_history = 0
+                separator = "\n\n---\n[End of Previous Update]\n---\n\n"
+                separator_tokens = count_tokens(separator)
+
+                for i, content_item in enumerate(summaries_content_chronological):
+                    item_tokens = count_tokens(content_item)
+                    effective_separator_tokens = separator_tokens if concatenated_parts else 0
+
+                    if current_total_tokens_for_history + item_tokens + effective_separator_tokens <= MAX_PREV_CONTEXT_TOKENS_SMART_LIMIT:
+                        if concatenated_parts: # Add separator if not the first part
+                            concatenated_parts.append(separator)
+                        concatenated_parts.append(content_item)
+                        current_total_tokens_for_history += item_tokens + effective_separator_tokens
+                    else:
+                        remaining_token_budget = MAX_PREV_CONTEXT_TOKENS_SMART_LIMIT - (current_total_tokens_for_history + effective_separator_tokens)
+                        if remaining_token_budget > 50: # Only add if a meaningful chunk can be added
+                            if concatenated_parts:
+                                concatenated_parts.append(separator)
+                            truncated_item_content = truncate_text_by_tokens(content_item, remaining_token_budget)
+                            concatenated_parts.append(truncated_item_content)
+                            # No need to update current_total_tokens_for_history further as we break
+                            logger.info(f"Stream {topic_stream.id}: Truncated content of summary part {i+1} to fit token limit.")
+                        else:
+                            logger.info(f"Stream {topic_stream.id}: Could not fit summary part {i+1} or a meaningful portion into context due to token limit.")
+                        break
+
+                if concatenated_parts:
+                    prev_summaries_concatenated_content = "".join(concatenated_parts)
+                    final_history_tokens = count_tokens(prev_summaries_concatenated_content) # Recalculate final token count precisely
+                    logger.info(f"Stream {topic_stream.id}: Using {len(recent_summaries_from_db)} fetched, effectively {len(concatenated_parts) // 2 + (1 if len(concatenated_parts) % 2 != 0 else 0) if separator_tokens > 0 else len(concatenated_parts)} summaries in concatenated context. Total est. tokens for history: {final_history_tokens}.")
+                else:
+                    logger.info(f"Stream {topic_stream.id}: No previous summaries fit within token limit for context.")
+            else:
+                logger.info(f"Stream {topic_stream.id}: No previous summaries found in DB to include in context.")
+        else:
+             logger.info(f"Stream {topic_stream.id}: Not including any previous summaries (num_summaries_to_fetch is 0 or overridden).")
+
+        model = topic_stream.model_type.value
         base_query = topic_stream.query
 
-        # If this is an update (not the first summary), specifically ask for new information
-        if prev_summary_content:
-            full_query = f"Provide ONLY NEW information about {base_query} that wasn't in the previous summary. Focus on recent developments, news, and updates."
+        if prev_summaries_concatenated_content:
+            full_query = f"Provide ONLY NEW information about {base_query} that wasn't in the previous updates. Focus on recent developments, news, and updates."
         else:
-             # For the initial search, just use the base query
-             full_query = base_query
+            full_query = base_query
 
-        # Use recency filter from topic stream
-        recency_filter = topic_stream.recency_filter
-
-        # Add instruction to format in markdown
         full_query += ". Format your response using markdown for better readability."
 
-        # If this is an update, add instruction to avoid repeating information
-        if prev_summary_content:
-            full_query += " DO NOT repeat information that was already covered previously."
-        
-        # Retrieve the custom system prompt from the TopicStream object
+        if prev_summaries_concatenated_content:
+            full_query += " DO NOT repeat information that was already covered in the previous updates."
+
+        recency_filter_for_api = topic_stream.recency_filter # e.g. '1d', '1w'
         stream_custom_system_prompt = topic_stream.system_prompt
-        # stream_custom_system_prompt will be None if not set in the DB
-        
-        logger.debug(f"For stream {topic_stream.id} - Query to API: {full_query}")
+
+        logger.debug(f"For stream {topic_stream.id} - Final User Query for API: {full_query[:200]}...")
         if stream_custom_system_prompt:
-            logger.debug(f"For stream {topic_stream.id} - Using custom system prompt: \'{stream_custom_system_prompt[:100]}...\'")
+            logger.debug(f"For stream {topic_stream.id} - Using Custom System Prompt: '{stream_custom_system_prompt[:100]}...'")
         else:
             logger.debug(f"For stream {topic_stream.id} - No custom system prompt, PerplexityAPI will use default.")
-        
-        # API call with detailed error handling
-        try:
-            result = await perplexity_api.search_perplexity(
-                query=full_query,
-                model=model,
-                recency_filter=recency_filter,
-                previous_summary=prev_summary_content,
-                temperature=topic_stream.temperature,
-                detail_level=topic_stream.detail_level.value,
-                custom_system_prompt=stream_custom_system_prompt  # <-- PASS THE CUSTOM PROMPT
-            )
-            logger.debug(f"API call successful, received response of {len(str(result))} characters")
-        except Exception as api_error:
-            logger.error(f"API call failed: {str(api_error)}", exc_info=True)
-            # Re-raise with more context
-            raise Exception(f"Error calling Perplexity API: {str(api_error)}")
-        
-        # Extract content from the result
+
+        result = await perplexity_api.search_perplexity(
+            query=full_query,
+            model=model,
+            recency_filter=recency_filter_for_api,
+            previous_summary=prev_summaries_concatenated_content,
+            temperature=topic_stream.temperature,
+            detail_level=topic_stream.detail_level.value,
+            custom_system_prompt=stream_custom_system_prompt
+        )
+
         content = result.get("answer", "No content available")
-        logger.debug(f"Extracted content of {len(content)} characters")
-        
-        # If no new information, provide a clear message
-        if not content or content == "No content available" or "no new information" in content.lower():
-            if prev_summary_content:
+        if not content or content == "No content available" or ("no new information" in content.lower() and len(content) < 100) :
+            if prev_summaries_concatenated_content: # Only say "no new info" if there was context
                 content = "No new information is available since the last update."
-            logger.warning("Received empty or default content from API")
-        
-        # Parse sources list from API result and encode as JSON string
+            logger.warning(f"Received empty or 'no new info' content from API for stream {topic_stream.id}")
+
         sources_list = result.get("sources", [])
-        try:
-            sources_json = json.dumps(sources_list)
-        except Exception:
-            logger.warning(f"Failed to encode sources list to JSON, defaulting to empty list. Sources list was: {sources_list}")
-            sources_json = json.dumps([])
-        logger.debug(f"Encoded {len(sources_list)} sources for storage: {sources_json[:100]}...")
-        
-        # Create summary
-        try:
-            summary = Summary(
-                topic_stream_id=topic_stream.id,
-                content=content,
-                sources=sources_json,
-                created_at=datetime.utcnow(),
-                model=model  # Save the model used for this summary
-            )
-            
-            # Update topic stream's last_updated
-            topic_stream.last_updated = datetime.utcnow()
-            
-            # Save to database
-            db.add(summary)
-            db.commit()
-            db.refresh(summary)
-            db.refresh(topic_stream)
-            
-            logger.debug(f"Created summary for topic stream {topic_stream.id}")
-            return summary
-        except Exception as db_error:
-            logger.error(f"Database error: {str(db_error)}", exc_info=True)
-            db.rollback()  # Roll back on error
-            raise Exception(f"Error saving to database: {str(db_error)}")
-            
+        sources_json = json.dumps(sources_list)
+        summary_model_used = result.get("model", model)
+
+        usage_stats = result.get("usage", {})
+        content_tokens_est = count_tokens(content)
+
+        summary = models.Summary(
+            topic_stream_id=topic_stream.id,
+            content=content,
+            sources=sources_json,
+            created_at=datetime.utcnow(),
+            model=summary_model_used,
+            prompt_tokens=usage_stats.get("prompt_tokens"),
+            completion_tokens=usage_stats.get("completion_tokens"),
+            total_tokens=usage_stats.get("total_tokens"),
+            estimated_content_tokens=content_tokens_est
+        )
+
+        topic_stream.last_updated = datetime.utcnow()
+        db.add(summary)
+        db.commit()
+        db.refresh(summary)
+        db.refresh(topic_stream)
+        logger.debug(f"Created summary ID {summary.id} for topic stream {topic_stream.id}")
+        return summary
+
     except Exception as e:
-        logger.error(f"Error creating summary: {str(e)}", exc_info=True)
+        logger.error(f"Error in perform_search_and_create_summary for stream ID {topic_stream.id if topic_stream else 'Unknown'}: {str(e)}", exc_info=True)
+        # It's important to re-raise or handle appropriately so the caller knows about the failure.
+        # The endpoint calling this will wrap it in an HTTPException.
         raise
 
 # Routes
@@ -413,43 +445,39 @@ async def create_topic_stream(
 ):
     try:
         logger.debug(f"Creating topic stream with data: {topic_stream}")
-        
+
         update_freq = UpdateFrequency(topic_stream.update_frequency)
         detail_lvl = DetailLevel(topic_stream.detail_level)
-        model = ModelType(topic_stream.model_type)
-        
-        logger.debug(f"Converted enums - freq: {update_freq}, detail: {detail_lvl}, model: {model}")
-        
-        db_topic_stream = TopicStream(
+        model_val = ModelType.R1_1776 if topic_stream.model_type == "r1-1776" else ModelType(topic_stream.model_type)
+
+        context_level_value = topic_stream.context_history_level if topic_stream.context_history_level else ContextHistoryLevel.LAST_ONE.value
+        context_hist_level_enum = ContextHistoryLevel(context_level_value)
+
+        logger.debug(f"Converted enums - freq: {update_freq}, detail: {detail_lvl}, model: {model_val}, context: {context_hist_level_enum})")
+
+        db_topic_stream = models.TopicStream(
             user_id=current_user.id,
             query=topic_stream.query,
             update_frequency=update_freq,
             detail_level=detail_lvl,
-            model_type=model,
+            model_type=model_val,
             recency_filter=topic_stream.recency_filter,
             system_prompt=topic_stream.system_prompt,
-            temperature=topic_stream.temperature
+            temperature=topic_stream.temperature,
+            context_history_level=context_hist_level_enum
         )
-        
-        logger.debug("Created TopicStream object")
+
         db.add(db_topic_stream)
         db.commit()
-        logger.debug("Committed to database")
         db.refresh(db_topic_stream)
-        logger.debug("Refreshed object")
-        
-        # Schedule updates using the global scheduler
-        # scheduler = get_scheduler()
-        # scheduler.schedule_topic_stream(db_topic_stream)
-        logger.debug("Scheduled topic stream updates")
-        
-        # Perform an immediate search and create the first summary
-        await perform_search_and_create_summary(db, db_topic_stream)
-        logger.debug("Initial search completed")
-        
-        # Refresh the object again to get the updated last_updated time
-        db.refresh(db_topic_stream)
-        
+
+        # scheduler_instance = get_scheduler() # If scheduler is re-enabled
+        # scheduler_instance.schedule_topic_stream(db_topic_stream)
+        logger.debug("Scheduled topic stream updates (if scheduler active)")
+
+        await perform_search_and_create_summary(db, db_topic_stream) # Initial summary
+        db.refresh(db_topic_stream) # Refresh again for last_updated
+
         return db_topic_stream
     except ValueError as e:
         logger.error(f"ValueError: {str(e)}")
@@ -559,7 +587,11 @@ def get_topic_stream_summaries(
                     content=summary.content,
                     sources=parsed_sources, # Use the parsed list
                     created_at=summary.created_at,
-                    model=summary.model if summary.model is not None else ""
+                    model=summary.model if summary.model is not None else "",
+                    prompt_tokens=summary.prompt_tokens,
+                    completion_tokens=summary.completion_tokens,
+                    total_tokens=summary.total_tokens,
+                    estimated_content_tokens=summary.estimated_content_tokens
                 )
             )
         
@@ -605,50 +637,46 @@ def delete_topic_stream(
 @app.post("/topic-streams/{topic_stream_id}/update-now", response_model=SummaryResponse)
 async def update_topic_stream_now(
     topic_stream_id: int,
-    background_tasks: BackgroundTasks,
+    options: UpdateNowOptions, # Request body for options
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    topic_stream = db.query(TopicStream).filter(
-        TopicStream.id == topic_stream_id,
-        TopicStream.user_id == current_user.id
+    topic_stream = db.query(models.TopicStream).filter(
+        models.TopicStream.id == topic_stream_id,
+        models.TopicStream.user_id == current_user.id
     ).first()
-    
+
     if not topic_stream:
         raise HTTPException(status_code=404, detail="Topic stream not found")
-    
+
     try:
-        logger.debug(f"Manual update requested for topic stream: {topic_stream.query}")
-        
-        # Detailed debug logging
-        logger.debug(f"Topic stream details: ID={topic_stream.id}, Query={topic_stream.query}, Model={topic_stream.model_type.value}, Recency={topic_stream.recency_filter}")
-        
-        try:
-            # Use a longer timeout for this operation
-            summary = await perform_search_and_create_summary(db, topic_stream)
-            logger.debug(f"Summary created successfully: ID={summary.id}")
-            
-            # Convert sources to list for response
-            parsed_sources = []
-            if summary.sources:
-                try:
-                    parsed_sources = json.loads(summary.sources)
-                    logger.debug(f"Parsed {len(parsed_sources)} sources from JSON")
-                except json.JSONDecodeError:
-                    logger.warning(f"Failed to decode sources JSON for summary {summary.id}")
-                    parsed_sources = []
-            
-            return SummaryResponse(
-                id=summary.id,
-                content=summary.content,
-                sources=parsed_sources,
-                created_at=summary.created_at,
-                model=summary.model if summary.model is not None else ""
-            )
-        except Exception as e:
-            logger.error(f"Error during search and summary creation: {str(e)}", exc_info=True)
-            raise
-            
+        logger.debug(f"Manual update for stream {topic_stream.id}. Override ignore all previous: {options.ignore_all_previous_summaries_override}")
+
+        summary = await perform_search_and_create_summary(
+            db,
+            topic_stream,
+            ignore_all_previous_summaries_override=options.ignore_all_previous_summaries_override
+        )
+
+        parsed_sources = []
+        if summary.sources:
+            try:
+                parsed_sources = json.loads(summary.sources)
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to decode sources JSON for summary {summary.id}: {summary.sources}")
+                parsed_sources = []
+
+        return SummaryResponse(
+            id=summary.id,
+            content=summary.content,
+            sources=parsed_sources,
+            created_at=summary.created_at,
+            model=summary.model if summary.model is not None else "",
+            prompt_tokens=summary.prompt_tokens,
+            completion_tokens=summary.completion_tokens,
+            total_tokens=summary.total_tokens,
+            estimated_content_tokens=summary.estimated_content_tokens
+        )
     except Exception as e:
         logger.error(f"Error updating topic stream: {str(e)}", exc_info=True)
         # Return more detailed error message
@@ -821,56 +849,39 @@ async def test_log_endpoint():
 @app.put("/topic-streams/{topic_stream_id}", response_model=TopicStreamResponse)
 async def update_topic_stream(
     topic_stream_id: int,
-    topic_stream: TopicStreamCreate,
+    topic_stream_data: TopicStreamCreate, # Use TopicStreamCreate for payload
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
-        logger.debug(f"Updating topic stream {topic_stream_id} with data: {topic_stream}")
-        
-        # Find the existing topic stream
-        db_topic_stream = db.query(TopicStream).filter(
-            TopicStream.id == topic_stream_id,
-            TopicStream.user_id == current_user.id
+        db_topic_stream = db.query(models.TopicStream).filter(
+            models.TopicStream.id == topic_stream_id,
+            models.TopicStream.user_id == current_user.id
         ).first()
-        
+
         if not db_topic_stream:
-            logger.warning(f"Topic stream {topic_stream_id} not found for user {current_user.id}")
             raise HTTPException(status_code=404, detail="Topic stream not found")
-        
-        # Convert enum values safely
-        try:
-            update_freq = UpdateFrequency(topic_stream.update_frequency)
-            detail_lvl = DetailLevel(topic_stream.detail_level)
-            
-            # Special handling for model_type to ensure r1-1776 works
-            if topic_stream.model_type == "r1-1776":
-                model = ModelType.R1_1776
-            else:
-                model = ModelType(topic_stream.model_type)
-                
-        except ValueError as e:
-            logger.error(f"Invalid enum value: {str(e)}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid enum value: {str(e)}"
-            )
-        
-        # Update the topic stream
-        db_topic_stream.query = topic_stream.query
-        db_topic_stream.update_frequency = update_freq
-        db_topic_stream.detail_level = detail_lvl
-        db_topic_stream.model_type = model
-        db_topic_stream.recency_filter = topic_stream.recency_filter
-        db_topic_stream.system_prompt = topic_stream.system_prompt
-        db_topic_stream.temperature = topic_stream.temperature
-        
+
+        logger.debug(f"Updating topic stream {topic_stream_id} with data: {topic_stream_data}")
+
+        db_topic_stream.query = topic_stream_data.query
+        db_topic_stream.update_frequency = UpdateFrequency(topic_stream_data.update_frequency)
+        db_topic_stream.detail_level = DetailLevel(topic_stream_data.detail_level)
+        if topic_stream_data.model_type == "r1-1776":
+            db_topic_stream.model_type = ModelType.R1_1776
+        else:
+            db_topic_stream.model_type = ModelType(topic_stream_data.model_type)
+        db_topic_stream.recency_filter = topic_stream_data.recency_filter
+        db_topic_stream.system_prompt = topic_stream_data.system_prompt
+        db_topic_stream.temperature = topic_stream_data.temperature
+
+        if topic_stream_data.context_history_level: # Check if provided in payload
+            db_topic_stream.context_history_level = ContextHistoryLevel(topic_stream_data.context_history_level)
+
         db.commit()
         db.refresh(db_topic_stream)
-        
         logger.debug(f"Successfully updated topic stream {topic_stream_id}")
         return db_topic_stream
-        
     except ValueError as e:
         logger.error(f"ValueError: {str(e)}")
         raise HTTPException(
