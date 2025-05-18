@@ -8,7 +8,8 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
     model_type: 'sonar-reasoning',
     recency_filter: '1d',
     temperature: 0.7,
-    system_prompt: ''
+    system_prompt: '',
+    context_history_level: 'last_1',
   });
   
   const [errors, setErrors] = useState({});
@@ -23,7 +24,8 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
         model_type: initialData.model_type || 'sonar-reasoning',
         recency_filter: initialData.recency_filter || '1d',
         temperature: typeof initialData.temperature === 'number' ? initialData.temperature : 0.7,
-        system_prompt: typeof initialData.system_prompt === 'string' ? initialData.system_prompt : ''
+        system_prompt: typeof initialData.system_prompt === 'string' ? initialData.system_prompt : '',
+        context_history_level: initialData.context_history_level || 'last_1',
       });
     } else {
       setFormData({
@@ -33,7 +35,8 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
         model_type: 'sonar-reasoning',
         recency_filter: '1d',
         temperature: 0.7,
-        system_prompt: '' // Ensure system_prompt is initialized for new forms
+        system_prompt: '',
+        context_history_level: 'last_1',
       });
     }
   }, [initialData]);
@@ -220,6 +223,14 @@ Do not include a References section at the end of your report.
     { value: '1m', label: 'Last month' },
     { value: '1y', label: 'Last year' }
   ];
+
+  const contextHistoryLevelOptions = [
+    { value: 'none', label: 'None (Always Fresh Update)' },
+    { value: 'last_1', label: 'Last 1 Summary (Default)' },
+    { value: 'last_3', label: 'Last 3 Summaries' },
+    { value: 'last_5', label: 'Last 5 Summaries' },
+    { value: 'all_smart_limit', label: 'Recent History (Smart Token Limit)' }
+  ];
   
   const handleChange = (e) => {
     const { name, value, type } = e.target;
@@ -272,7 +283,13 @@ Do not include a References section at the end of your report.
     if (formData.temperature < 0 || formData.temperature > 1) {
       newErrors.temperature = 'Temperature must be between 0 and 1';
     }
-    
+
+    // Inside validateForm()
+    const validContextHistoryLevels = contextHistoryLevelOptions.map(o => o.value);
+    if (!formData.context_history_level || !validContextHistoryLevels.includes(formData.context_history_level)) {
+        newErrors.context_history_level = 'Please select a valid context depth.';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -326,7 +343,8 @@ Do not include a References section at the end of your report.
           model_type: 'sonar-reasoning',
           recency_filter: '1d',
           temperature: 0.7,
-          system_prompt: ''
+          system_prompt: '',
+          context_history_level: 'last_1',
         });
       }
       setErrors({});
@@ -548,6 +566,34 @@ Do not include a References section at the end of your report.
           {errors.recency_filter && (
             <p className="mt-1 text-sm text-destructive">{errors.recency_filter}</p>
           )}
+        </div>
+
+        <div className="sm:col-span-1">
+          <label htmlFor="context_history_level" className="block text-sm font-medium text-foreground">
+            Update Context Depth
+          </label>
+          <select
+            id="context_history_level"
+            name="context_history_level"
+            value={formData.context_history_level}
+            onChange={handleChange}
+            className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-border focus:outline-none focus:ring-ring focus:border-border sm:text-sm rounded-md ${
+              errors.context_history_level ? 'border-destructive' : ''
+            } bg-background text-foreground`}
+            data-testid="context-history-level-select"
+          >
+            {contextHistoryLevelOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {errors.context_history_level && (
+            <p className="mt-1 text-sm text-destructive">{errors.context_history_level}</p>
+          )}
+          <p className="mt-1 text-xs text-muted-foreground">
+            How many past summaries to include for new updates.
+          </p>
         </div>
       </div>
       
