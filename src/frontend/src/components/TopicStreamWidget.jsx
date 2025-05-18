@@ -74,7 +74,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
 
   // State for token count
-  const [totalStoredEstTokens, setTotalStoredEstTokens] = useState(0);
+  const [totalStoredEstTokens, setTotalStoredEstTokens] = useState(stream.total_stored_est_tokens || 0);
 
   // State for override checkbox
   const [ignorePreviousForThisUpdateOverride, setIgnorePreviousForThisUpdateOverride] = useState(false);
@@ -85,15 +85,10 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     fetchSummaries();
   }, [stream.id]);
 
+  // Update total stored tokens when the stream prop changes (e.g., after update)
   useEffect(() => {
-    // Calculate total estimated content tokens from fetched summaries
-    if (summaries && summaries.length > 0) {
-        const sumOfEstTokens = summaries.reduce((acc, s) => acc + (s.estimated_content_tokens || 0), 0);
-        setTotalStoredEstTokens(sumOfEstTokens);
-    } else {
-        setTotalStoredEstTokens(0);
-    }
-  }, [summaries]);
+    setTotalStoredEstTokens(stream.total_stored_est_tokens || 0);
+  }, [stream.total_stored_est_tokens]);
 
   const fetchSummaries = async () => {
     try {
@@ -308,6 +303,8 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   if (!stream) {
     return null;
   }
+
+  console.log(`TopicStreamWidget mounted/rendered for stream ID ${stream.id}. Total Stored Est Tokens from prop: ${stream.total_stored_est_tokens}`);
 
   // Calculate time since last update
   const lastUpdateTimestamp = summaries.length > 0 ? summaries[0].created_at : null;

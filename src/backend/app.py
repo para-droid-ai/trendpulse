@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -88,6 +88,7 @@ class TopicStreamResponse(BaseModel):
     system_prompt: Optional[str] = None
     temperature: float
     context_history_level: str
+    total_stored_est_tokens: int = 0 # Add field for total estimated tokens of stored summaries
     
     class Config:
         orm_mode = True
@@ -493,31 +494,43 @@ async def create_topic_stream(
         )
 
 @app.get("/topic-streams/")
-async def get_topic_streams(db: Session = Depends(get_db)):
-    try:
-        streams = db.query(models.TopicStream).all()
-        return streams
-    except Exception as e:
-        logger.error(f"Error fetching topic streams: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error fetching streams")
-
-@app.get("/topic-streams/", response_model=List[TopicStreamResponse])
-def get_topic_streams(
+async def get_topic_streams(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
         logger.debug(f"Fetching topic streams for user ID: {current_user.id}, email: {current_user.email}")
         
-        streams = db.query(TopicStream).filter(TopicStream.user_id == current_user.id).all()
+        # Fetch topic streams and their associated summaries in one query for efficiency
+        streams = db.query(TopicStream).options(joinedload(TopicStream.summaries)).filter(TopicStream.user_id == current_user.id).all()
         logger.debug(f"Found {len(streams)} topic streams for user {current_user.id}")
         
-        # Convert model objects to dicts with proper enum handling
+        # Manually construct the response to include the calculated total_stored_est_tokens
         result = []
         for stream in streams:
-            stream_dict = model_to_dict(stream)
-            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream_dict['model_type']}")
-            result.append(stream_dict)
+            # Calculate total estimated tokens for summaries
+            total_est_tokens = 0
+            for summary in stream.summaries:
+                if summary.estimated_content_tokens is not None:
+                    total_est_tokens += summary.estimated_content_tokens
+            
+            # Construct the dictionary for the response, mapping enum values and including the token count
+            stream_response_data = {
+                "id": stream.id,
+                "query": stream.query,
+                "update_frequency": stream.update_frequency.value if isinstance(stream.update_frequency, Enum) else stream.update_frequency,
+                "detail_level": stream.detail_level.value if isinstance(stream.detail_level, Enum) else stream.detail_level,
+                "model_type": stream.model_type.value if isinstance(stream.model_type, Enum) else stream.model_type,
+                "recency_filter": stream.recency_filter,
+                "last_updated": stream.last_updated.isoformat() if stream.last_updated else None,
+                "system_prompt": stream.system_prompt,
+                "temperature": stream.temperature,
+                "context_history_level": stream.context_history_level.value if isinstance(stream.context_history_level, Enum) else stream.context_history_level,
+                "total_stored_est_tokens": total_est_tokens # Include the calculated value
+            }
+            result.append(stream_response_data)
+            
+            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream_response_data['model_type']}, Total Stored Tokens: {total_est_tokens}")
             
         return result
     except Exception as e:
