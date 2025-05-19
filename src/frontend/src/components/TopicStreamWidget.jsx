@@ -385,12 +385,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#818cf8] dark:text-black">
                      {timeSinceLastUpdate}
                    </span>
-                   {/* Auto-Updates Off Indicator */}
+                   {/* --- CONSOLIDATED AUTO-UPDATE BADGE --- */}
                    {!stream.auto_update_enabled && (
                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                        Auto-Updates Off
                      </span>
                    )}
+                   {/* --- END CONSOLIDATED BADGE --- */}
                  </div>
                </div>
 
@@ -471,100 +472,85 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             </div>
 
             {/* Token count for List View - Below buttons, inside header, right aligned */}
+            {/* Removed this block as the new grid view section will handle tokens */}
+            {/*
             {!isGridView && (totalStoredEstTokens > 0 || !loading) && (
-              <div className="flex justify-end mt-2"> {/* Container to align tag to the right */}
+              <div className="flex justify-end mt-2"> /--* Container to align tag to the right *--/
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
                   Estimated Stream Tokens: {totalStoredEstTokens}
                 </span>
               </div>
             )}
+            */}
 
-            {/* Action buttons for grid view, placed below title/tags */}
+            {/* Action buttons and Token count for Grid View */}
             {isGridView && (
-              <div className="flex items-center justify-between mt-2 w-full"> {/* Container for token counter and buttons */} 
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50"> {/* A new line with top border */}
                 {/* Token count for Grid View - Left aligned */}
-                {(totalStoredEstTokens > 0 || !loading) && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
-                    Estimated Stream Tokens: {totalStoredEstTokens}
-                  </span>
-                )}
-                {/* Action Buttons for Grid View - Right aligned */} 
-                <div className="flex space-x-1 items-center flex-shrink-0"> {/* Container for the buttons */}
-                   {/* Auto-Updates Off Indicator for Grid View */}
-                   {!stream.auto_update_enabled && (
-                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground mr-2"> {/* Added mr-2 for spacing */}
-                       Auto-Updates Off
-                     </span>
-                   )}
-                   {/* Edit Button */}
-                   <button
-                     onClick={handleEdit}
-                     className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
-                     title="Edit Stream"
-                   >
-                      {/* Pencil Icon */}
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                      </svg>
-                    </button>
+                <div> {/* Wrap in a div to allow for future additions here if needed */}
+                  {(totalStoredEstTokens > 0 || !loading) && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
+                      Est. Stream Tokens: {totalStoredEstTokens}
+                    </span>
+                  )}
+                </div>
 
-                    {/* Update Now Button */}
-                    <button
-                      onClick={handleUpdateNow}
-                      disabled={updating}
-                      className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      title={updating ? 'Updating...' : 'Update Now'}
-                    >
-                       {/* Using SVG file from public folder */}
-                       <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
-                    </button>
+                {/* Action Buttons for Grid View - Right aligned */}
+                <div className="flex space-x-1 items-center"> {/* Container for the buttons */}
+                  {/* Edit Button */}
+                  <button
+                    onClick={handleEdit}
+                    className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                    title="Edit Stream"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    </svg>
+                  </button>
 
-                    {/* Delete Button */}
-                    <button
-                      onClick={handleDeleteStream}
-                      className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                      title="Delete Stream"
-                    >
-                       {/* Using trashcan SVG file from public folder */}
-                       <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
-                    </button>
+                  {/* Update Now Button */}
+                  <button
+                    onClick={handleUpdateNow} // Ensure this calls the correct updateNow for the specific stream
+                    disabled={updating}
+                    className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={updating ? 'Updating...' : 'Update Now'}
+                  >
+                    <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
+                  </button>
 
-                    {/* Export Button */}
+                  {/* Delete Stream Button */}
+                  <button
+                    onClick={handleDeleteStream} // This is for deleting the whole stream
+                    className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                    title="Delete Stream"
+                  >
+                    <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
+                  </button>
+
+                  {/* Export Button & Dropdown (simplified for brevity, ensure your existing logic is maintained) */}
+                  <div className="relative"> {/* Added relative positioning for dropdown */}
                     <button
-                      onClick={() => setShowExportOptions(!showExportOptions)}
+                      onClick={() => setShowExportOptions(prev => !prev)} // Toggle export options
                       className="py-1 px-2 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors text-xs"
                     >
                       Export
                     </button>
-
-                    {/* Export Options Dropdown */}
                     {showExportOptions && (
-                      <div className="absolute right-0 top-full mt-1 w-48 bg-popover rounded-md shadow-lg z-10"> {/* Position relative to button */}
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-20"> {/* Adjusted z-index */}
                         <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                          <button
-                            onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
-                            className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                            role="menuitem"
-                          >
+                          <button onClick={() => { copyToClipboard(); setShowExportOptions(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted" role="menuitem">
                             Copy to Clipboard
                           </button>
-                          <button
-                            onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
-                            className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                            role="menuitem"
-                          >
+                          <button onClick={() => { exportAsFile('md'); setShowExportOptions(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted" role="menuitem">
                             Export as .md
                           </button>
-                          <button
-                            onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
-                            className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                            role="menuitem"
-                          >
+                          <button onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted" role="menuitem">
                             Export as .txt
                           </button>
                         </div>
                       </div>
                     )}
+                  </div>
                 </div>
               </div>
             )}
