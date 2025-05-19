@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum, Text, Float
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum as SQLEnum, Text, Float, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import text as sa_text # Import for server_default raw SQL
 from datetime import datetime
@@ -64,6 +64,12 @@ class TopicStream(Base):
                                    default=ContextHistoryLevel.LAST_ONE, 
                                    server_default=ContextHistoryLevel.LAST_ONE.value, 
                                    nullable=False)
+    
+    # Add auto_update_enabled column
+    auto_update_enabled = Column(Boolean, 
+                                 default=True, 
+                                 server_default=sa_text('1'), 
+                                 nullable=False)
 
     user = relationship("User", back_populates="topic_streams")
     summaries = relationship("Summary", back_populates="topic_stream", cascade="all, delete-orphan")

@@ -279,18 +279,51 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
   // Function to export content as a file
   const exportAsFile = (formatType) => {
-    const content = formatStreamContent(stream, summaries, formatType);
-    const blob = new Blob([content], { type: formatType === 'md' ? 'text/markdown' : 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    // Sanitize filename (replace spaces with underscores, remove special characters)
-    const sanitizedQuery = stream.query.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
-    const filename = `${sanitizedQuery}.${formatType}`;
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url); // Clean up the object URL
+    console.log(`[TopicStreamWidget] Attempting to export as ${formatType}`);
+    try {
+      console.log(`[TopicStreamWidget] Formatting content for ${formatType}...`);
+      const content = formatStreamContent(stream, summaries, formatType);
+      console.log(`[TopicStreamWidget] Content formatted. Length: ${content.length}`);
+
+      console.log(`[TopicStreamWidget] Creating Blob... Type: ${formatType === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8'}`);
+      const blob = new Blob([content], { type: formatType === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' });
+      console.log(`[TopicStreamWidget] Blob created.`);
+
+      console.log(`[TopicStreamWidget] Creating object URL from Blob...`);
+      const url = URL.createObjectURL(blob);
+      console.log(`[TopicStreamWidget] Object URL created: ${url}`);
+
+      const a = document.createElement('a');
+      // Improve filename sanitization and provide a fallback
+      const sanitizedQuery = (stream.query || 'untitled_stream').replace(/[\s\\\\/:*?"<>|]+/g, '_').substring(0, 50);
+      const filename = `${sanitizedQuery}.${formatType}`;
+      console.log(`[TopicStreamWidget] Generated filename: ${filename}`);
+
+      a.href = url;
+      a.download = filename;
+      console.log('[TopicStreamWidget] Appending link to body and clicking...');
+      document.body.appendChild(a);
+      a.click();
+      console.log('[TopicStreamWidget] Link clicked. Scheduling cleanup...');
+
+      // Add a small setTimeout (e.g., 100ms) before revoking the object URL and removing the temporary anchor element.
+      setTimeout(() => {
+        console.log('[TopicStreamWidget] Executing cleanup...');
+        if (document.body.contains(a)) { // Check if element still exists
+          document.body.removeChild(a);
+          console.log('[TopicStreamWidget] Link element removed from body.');
+        } else {
+           console.log('[TopicStreamWidget] Link element not found in body, likely already removed.');
+        }
+        URL.revokeObjectURL(url); // Clean up the object URL
+        console.log(`[TopicStreamWidget] Cleaned up object URL: ${url}`);
+      }, 100); // 100ms delay
+
+    } catch (err) {
+      console.error(`[TopicStreamWidget] Error during exportAsFile (${formatType}):`, err);
+      setCopyFeedback(`Export failed: ${err.message || 'Unknown error'}`); // Or use a new state
+      setTimeout(() => setCopyFeedback(''), 3000);
+    }
   };
 
   if (!stream) {
@@ -352,6 +385,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#818cf8] dark:text-black">
                      {timeSinceLastUpdate}
                    </span>
+                   {/* Auto-Updates Off Indicator */}
+                   {!stream.auto_update_enabled && (
+                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                       Auto-Updates Off
+                     </span>
+                   )}
                  </div>
                </div>
 
@@ -451,6 +490,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                 )}
                 {/* Action Buttons for Grid View - Right aligned */} 
                 <div className="flex space-x-1 items-center flex-shrink-0"> {/* Container for the buttons */}
+                   {/* Auto-Updates Off Indicator for Grid View */}
+                   {!stream.auto_update_enabled && (
+                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground mr-2"> {/* Added mr-2 for spacing */}
+                       Auto-Updates Off
+                     </span>
+                   )}
                    {/* Edit Button */}
                    <button
                      onClick={handleEdit}

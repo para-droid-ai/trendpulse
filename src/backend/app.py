@@ -119,6 +119,7 @@ class TopicStreamCreate(BaseModel):
     system_prompt: Optional[str] = None
     temperature: float = 0.7
     context_history_level: Optional[str] = ContextHistoryLevel.LAST_ONE.value
+    auto_update_enabled: Optional[bool] = True
 
 class TopicStreamResponse(BaseModel):
     id: int
@@ -131,7 +132,8 @@ class TopicStreamResponse(BaseModel):
     system_prompt: Optional[str] = None
     temperature: float
     context_history_level: str
-    total_stored_est_tokens: int = 0 # Add field for total estimated tokens of stored summaries
+    total_stored_est_tokens: int = 0
+    auto_update_enabled: bool
     
     class Config:
         orm_mode = True
@@ -478,7 +480,8 @@ async def create_topic_stream(
             recency_filter=topic_stream.recency_filter,
             system_prompt=topic_stream.system_prompt,
             temperature=topic_stream.temperature,
-            context_history_level=context_hist_level_enum
+            context_history_level=context_hist_level_enum,
+            auto_update_enabled=topic_stream.auto_update_enabled
         )
 
         db.add(db_topic_stream)
@@ -487,10 +490,12 @@ async def create_topic_stream(
 
         # Re-enable scheduler interaction - uncomment
         scheduler_instance = get_scheduler() 
-        if scheduler_instance: # Add a check to ensure it's initialized
+        if scheduler_instance and db_topic_stream.auto_update_enabled: # Check auto_update_enabled
             # The scheduler's schedule_topic_stream method includes logic to run immediately for new streams
             scheduler_instance.schedule_topic_stream(db_topic_stream)
-            logger.debug(f"Scheduled topic stream updates for new stream ID: {db_topic_stream.id}")
+            logger.debug(f"Scheduled topic stream updates for new stream ID: {db_topic_stream.id} because auto-update is enabled.")
+        elif not db_topic_stream.auto_update_enabled:
+            logger.debug(f"New stream ID: {db_topic_stream.id} created with auto-update disabled. Not scheduling.")
         else:
             logger.error("Scheduler not available, cannot schedule new stream.")
 
@@ -544,11 +549,16 @@ async def get_topic_streams(
                 "system_prompt": stream.system_prompt,
                 "temperature": stream.temperature,
                 "context_history_level": stream.context_history_level.value if isinstance(stream.context_history_level, Enum) else stream.context_history_level,
-                "total_stored_est_tokens": total_est_tokens # Include the calculated value
+                "total_stored_est_tokens": total_est_tokens, # Include the calculated value
+                "auto_update_enabled": stream.auto_update_enabled # --- ADDED THIS LINE ---
             }
-            result.append(stream_response_data)
             
-            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream_response_data['model_type']}, Total Stored Tokens: {total_est_tokens}")
+            # result.append(stream_response_data) # Assuming FastAPI will validate against ResponseModel
+            # Alternatively, explicitly create the Pydantic model instance if needed:
+            validated_stream_data = TopicStreamResponse(**stream_response_data)
+            result.append(validated_stream_data) # Append the Pydantic model instance
+            
+            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream_response_data['model_type']}, Total Stored Tokens: {total_est_tokens}, Auto Update Enabled: {stream_response_data['auto_update_enabled']}")
             
         return result
     except Exception as e:
@@ -894,23 +904,39 @@ async def update_topic_stream(
 
         logger.debug(f"Updating topic stream {topic_stream_id} with data: {topic_stream_data}")
 
-        db_topic_stream.query = topic_stream_data.query
-        db_topic_stream.update_frequency = UpdateFrequency(topic_stream_data.update_frequency)
-        db_topic_stream.detail_level = DetailLevel(topic_stream_data.detail_level)
-        if topic_stream_data.model_type == "r1-1776":
-            db_topic_stream.model_type = ModelType.R1_1776
-        else:
-            db_topic_stream.model_type = ModelType(topic_stream_data.model_type)
-        db_topic_stream.recency_filter = topic_stream_data.recency_filter
-        db_topic_stream.system_prompt = topic_stream_data.system_prompt
-        db_topic_stream.temperature = topic_stream_data.temperature
-
-        if topic_stream_data.context_history_level: # Check if provided in payload
-            db_topic_stream.context_history_level = ContextHistoryLevel(topic_stream_data.context_history_level)
+        # Update model fields from payload if provided (excluding id and user_id)
+        for field, value in topic_stream_data.dict(exclude_unset=True).items():
+            if field == 'update_frequency':
+                setattr(db_topic_stream, field, UpdateFrequency(value))
+            elif field == 'detail_level':
+                 setattr(db_topic_stream, field, DetailLevel(value))
+            elif field == 'model_type':
+                 setattr(db_topic_stream, field, ModelType.R1_1776 if value == "r1-1776" else ModelType(value))
+            elif field == 'context_history_level':
+                 setattr(db_topic_stream, field, ContextHistoryLevel(value))
+            elif field == 'auto_update_enabled':
+                # Ensure the value is a boolean
+                bool_value = bool(value)
+                setattr(db_topic_stream, field, bool_value)
+                logger.info(f"Updating stream {db_topic_stream.id} auto_update_enabled to: {bool_value}")
+            else:
+                setattr(db_topic_stream, field, value)
 
         db.commit()
         db.refresh(db_topic_stream)
-        logger.debug(f"Successfully updated topic stream {topic_stream_id}")
+
+        # Add logic to interact with the scheduler based on auto_update_enabled
+        scheduler_instance = get_scheduler()
+        if scheduler_instance:
+            if db_topic_stream.auto_update_enabled:
+                logger.info(f"Stream {db_topic_stream.id} updated with auto-update enabled. Re-scheduling.")
+                scheduler_instance.schedule_topic_stream(db_topic_stream)
+            else:
+                logger.info(f"Stream {db_topic_stream.id} updated with auto-update disabled. Removing from schedule.")
+                scheduler_instance.remove_topic_stream(db_topic_stream.id)
+        else:
+            logger.error("Scheduler not available, cannot interact with schedule during update.")
+
         return db_topic_stream
     except ValueError as e:
         logger.error(f"ValueError: {str(e)}")

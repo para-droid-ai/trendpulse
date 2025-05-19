@@ -10,6 +10,7 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
     temperature: 0.7,
     system_prompt: '',
     context_history_level: 'last_1',
+    auto_update_enabled: true,
   });
   
   const [errors, setErrors] = useState({});
@@ -17,6 +18,10 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
   
   useEffect(() => {
     if (initialData) {
+      console.log('[TopicStreamForm] Received initialData.auto_update_enabled:', 
+                  initialData.auto_update_enabled, 
+                  '(type:', typeof initialData.auto_update_enabled + ')');
+
       setFormData({
         query: initialData.query || '',
         update_frequency: initialData.update_frequency || 'daily',
@@ -26,6 +31,7 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
         temperature: typeof initialData.temperature === 'number' ? initialData.temperature : 0.7,
         system_prompt: typeof initialData.system_prompt === 'string' ? initialData.system_prompt : '',
         context_history_level: initialData.context_history_level || 'last_1',
+        auto_update_enabled: initialData.auto_update_enabled !== undefined ? initialData.auto_update_enabled : true,
       });
     } else {
       setFormData({
@@ -37,6 +43,7 @@ const TopicStreamForm = ({ onSubmit, initialData = null, isEditing = false, onCa
         temperature: 0.7,
         system_prompt: '',
         context_history_level: 'last_1',
+        auto_update_enabled: true,
       });
     }
   }, [initialData]);
@@ -345,6 +352,7 @@ Do not include a References section at the end of your report.
           temperature: 0.7,
           system_prompt: '',
           context_history_level: 'last_1',
+          auto_update_enabled: true,
         });
       }
       setErrors({});
@@ -595,6 +603,23 @@ Do not include a References section at the end of your report.
             How many past summaries to include for new updates.
           </p>
         </div>
+
+        {/* Auto Update Enabled Checkbox */}
+        <div className="sm:col-span-2 flex items-center pt-3">
+          <input
+            type="checkbox"
+            name="auto_update_enabled"
+            id="auto_update_enabled"
+            checked={formData.auto_update_enabled}
+            onChange={(e) => setFormData(prev => ({ ...prev, auto_update_enabled: e.target.checked }))}
+            className="h-4 w-4 text-primary focus:ring-ring border-border rounded accent-primary"
+            data-testid="auto-update-checkbox"
+          />
+          <label htmlFor="auto_update_enabled" className="ml-2 block text-sm font-medium text-foreground">
+            Enable Automatic Updates
+          </label>
+        </div>
+
       </div>
       
       <div className="space-y-3">
