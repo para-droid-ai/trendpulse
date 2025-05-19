@@ -79,7 +79,7 @@ TrendPulse employs a sophisticated context handling strategy to ensure that auto
 
 ### How it Works:
 1.  **User Configuration:** When creating or editing a Topic Stream, users can specify the `Context History Level`. This determines how much of the recent summary history (e.g., none, last 1, last 3, last 5, or a smart-limited selection of recent summaries) should be considered when generating a new update.
-2.  **Recency Filtering:** The system always uses the Perplexity API's `search_recency_filter` (e.g., '1d' for daily, '1w' for weekly) to limit the initial search scope to the desired timeframe.
+2.  **Recency Filtering:** The system always uses the Perplexity API's `search_recency_filter` (e.g., '1d' last day, '1w' last week) to limit the initial search scope to the desired timeframe.
 3.  **Contextual Prompting:**
     *   If historical context is to be included (based on the user's setting and not overridden by a "force fresh update" manual trigger):
         *   The relevant previous summaries are fetched from the database.
