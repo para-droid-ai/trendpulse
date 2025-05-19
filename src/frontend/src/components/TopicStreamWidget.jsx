@@ -76,9 +76,6 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   // State for token count
   const [totalStoredEstTokens, setTotalStoredEstTokens] = useState(stream.total_stored_est_tokens || 0);
 
-  // State for override checkbox
-  const [ignorePreviousForThisUpdateOverride, setIgnorePreviousForThisUpdateOverride] = useState(false);
-
   const theme = useTheme();
 
   useEffect(() => {
@@ -115,17 +112,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
       setUpdating(true);
       setError('');
 
-      const options = { 
-          ignore_all_previous_summaries_override: ignorePreviousForThisUpdateOverride 
-      };
-      const newSummary = await topicStreamAPI.updateNow(stream.id, options);
+      const newSummary = await topicStreamAPI.updateNow(stream.id);
 
       if (newSummary.content && newSummary.content.includes("No new information is available")) {
         setError('No new information is available since the last update.');
       } else {
         setSummaries([newSummary, ...summaries]);
       }
-      setIgnorePreviousForThisUpdateOverride(false); // Reset override after use
     } catch (err) {
       console.error('Failed to update stream:', err);
       setError(err.message || 'Failed to update stream. Please try again.');
@@ -286,18 +279,51 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
 
   // Function to export content as a file
   const exportAsFile = (formatType) => {
-    const content = formatStreamContent(stream, summaries, formatType);
-    const blob = new Blob([content], { type: formatType === 'md' ? 'text/markdown' : 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    // Sanitize filename (replace spaces with underscores, remove special characters)
-    const sanitizedQuery = stream.query.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
-    const filename = `${sanitizedQuery}.${formatType}`;
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url); // Clean up the object URL
+    console.log(`[TopicStreamWidget] Attempting to export as ${formatType}`);
+    try {
+      console.log(`[TopicStreamWidget] Formatting content for ${formatType}...`);
+      const content = formatStreamContent(stream, summaries, formatType);
+      console.log(`[TopicStreamWidget] Content formatted. Length: ${content.length}`);
+
+      console.log(`[TopicStreamWidget] Creating Blob... Type: ${formatType === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8'}`);
+      const blob = new Blob([content], { type: formatType === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' });
+      console.log(`[TopicStreamWidget] Blob created.`);
+
+      console.log(`[TopicStreamWidget] Creating object URL from Blob...`);
+      const url = URL.createObjectURL(blob);
+      console.log(`[TopicStreamWidget] Object URL created: ${url}`);
+
+      const a = document.createElement('a');
+      // Improve filename sanitization and provide a fallback
+      const sanitizedQuery = (stream.query || 'untitled_stream').replace(/[\s\\\\/:*?"<>|]+/g, '_').substring(0, 50);
+      const filename = `${sanitizedQuery}.${formatType}`;
+      console.log(`[TopicStreamWidget] Generated filename: ${filename}`);
+
+      a.href = url;
+      a.download = filename;
+      console.log('[TopicStreamWidget] Appending link to body and clicking...');
+      document.body.appendChild(a);
+      a.click();
+      console.log('[TopicStreamWidget] Link clicked. Scheduling cleanup...');
+
+      // Add a small setTimeout (e.g., 100ms) before revoking the object URL and removing the temporary anchor element.
+      setTimeout(() => {
+        console.log('[TopicStreamWidget] Executing cleanup...');
+        if (document.body.contains(a)) { // Check if element still exists
+          document.body.removeChild(a);
+          console.log('[TopicStreamWidget] Link element removed from body.');
+        } else {
+           console.log('[TopicStreamWidget] Link element not found in body, likely already removed.');
+        }
+        URL.revokeObjectURL(url); // Clean up the object URL
+        console.log(`[TopicStreamWidget] Cleaned up object URL: ${url}`);
+      }, 100); // 100ms delay
+
+    } catch (err) {
+      console.error(`[TopicStreamWidget] Error during exportAsFile (${formatType}):`, err);
+      setCopyFeedback(`Export failed: ${err.message || 'Unknown error'}`); // Or use a new state
+      setTimeout(() => setCopyFeedback(''), 3000);
+    }
   };
 
   if (!stream) {
@@ -359,6 +385,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#818cf8] dark:text-black">
                      {timeSinceLastUpdate}
                    </span>
+                   {/* Auto-Updates Off Indicator */}
+                   {!stream.auto_update_enabled && (
+                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                       Auto-Updates Off
+                     </span>
+                   )}
                  </div>
                </div>
 
@@ -458,6 +490,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                 )}
                 {/* Action Buttons for Grid View - Right aligned */} 
                 <div className="flex space-x-1 items-center flex-shrink-0"> {/* Container for the buttons */}
+                   {/* Auto-Updates Off Indicator for Grid View */}
+                   {!stream.auto_update_enabled && (
+                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground mr-2"> {/* Added mr-2 for spacing */}
+                       Auto-Updates Off
+                     </span>
+                   )}
                    {/* Edit Button */}
                    <button
                      onClick={handleEdit}
@@ -726,20 +764,6 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
               {copyFeedback}
             </div>
           )}
-
-          {/* In the header section of TopicStreamWidget, after other buttons */}
-          <div className="mt-2 flex items-center self-start w-full"> {/* self-start to align left if in a flex container */}
-              <input
-                  type="checkbox"
-                  id={`ignore-previous-override-${stream.id}`}
-                  checked={ignorePreviousForThisUpdateOverride}
-                  onChange={(e) => setIgnorePreviousForThisUpdateOverride(e.target.checked)}
-                  className="h-3.5 w-3.5 text-primary focus:ring-ring border-border rounded mr-1.5 accent-primary"
-              />
-              <label htmlFor={`ignore-previous-override-${stream.id}`} className="text-xs text-muted-foreground">
-                  Force fresh update (ignore stream's context setting for this time)
-              </label>
-          </div>
         </>
       )}
     </div>

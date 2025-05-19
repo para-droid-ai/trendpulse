@@ -19,11 +19,11 @@ import asyncio
 import re
 from utils.tokenizer_utils import count_tokens, truncate_text_by_tokens
 from models import Base, User, TopicStream, Summary, UpdateFrequency, DetailLevel, ModelType, ContextHistoryLevel
-# Temporarily comment out the scheduler import to avoid the dependency error
-# from scheduler import TopicStreamScheduler
+from scheduler import TopicStreamScheduler
 from perplexity_api import PerplexityAPI
 from database import SessionLocal, engine
 import models  # Add missing models import
+from contextlib import asynccontextmanager
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -36,11 +36,58 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # Increase to 24 hours for better user exper
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-app = FastAPI(title="TrendPulse Dashboard API")
-# Temporarily disable scheduler
-# scheduler = None
+# Initialize logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
-# Configure CORS
+# Global scheduler variable - uncomment
+scheduler: TopicStreamScheduler | None = None
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# get_scheduler function - uncomment
+def get_scheduler() -> TopicStreamScheduler | None:
+    # This helper is less crucial now with lifespan managing initialization,
+    # but kept for potential direct access if needed elsewhere.
+    # The global scheduler variable should be set by lifespan.
+    return scheduler
+
+# Define a context manager for the application lifespan (Keep this defined before app uses it)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global scheduler # Ensure you're using the global scheduler variable
+    # db_for_startup = SessionLocal() # No longer pass db here, scheduler will manage its own sessions per job
+    try:
+        logger.info("Application startup: Initializing TopicStreamScheduler...")
+        # Pass the SessionLocal factory and the async function perform_search_and_create_summary
+        # Make sure perform_search_and_create_summary is defined in this file
+        scheduler = TopicStreamScheduler(SessionLocal, perform_search_and_create_summary) 
+        logger.info("TopicStreamScheduler initialized and its thread started.")
+    except Exception as e:
+        logger.error(f"Failed to initialize scheduler during startup: {e}", exc_info=True)
+    # finally:
+        # db_for_startup.close() # No session to close here anymore
+    
+    yield # Application runs here
+    
+    # Shutdown event
+    logger.info("Application shutdown: Shutting down TopicStreamScheduler...")
+    if scheduler:
+        scheduler.shutdown()
+        logger.info("TopicStreamScheduler shut down successfully.")
+    else:
+        logger.warning("Scheduler was not initialized, nothing to shut down.")
+
+# Move the FastAPI app initialization BEFORE middleware and routes
+app = FastAPI(title="TrendPulse Dashboard API", lifespan=lifespan) # Ensure lifespan is used here
+
+# Configure CORS - Move this down below app initialization
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000"
@@ -53,10 +100,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize logger
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
 # Pydantic models
 class UserCreate(BaseModel):
@@ -76,6 +119,7 @@ class TopicStreamCreate(BaseModel):
     system_prompt: Optional[str] = None
     temperature: float = 0.7
     context_history_level: Optional[str] = ContextHistoryLevel.LAST_ONE.value
+    auto_update_enabled: Optional[bool] = True
 
 class TopicStreamResponse(BaseModel):
     id: int
@@ -88,7 +132,8 @@ class TopicStreamResponse(BaseModel):
     system_prompt: Optional[str] = None
     temperature: float
     context_history_level: str
-    total_stored_est_tokens: int = 0 # Add field for total estimated tokens of stored summaries
+    total_stored_est_tokens: int = 0
+    auto_update_enabled: bool
     
     class Config:
         orm_mode = True
@@ -147,14 +192,6 @@ def model_to_dict(obj):
                 result[key] = value
         return result
     return obj
-
-# Database dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # Security functions
 def verify_password(plain_password, hashed_password):
@@ -416,28 +453,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
             detail="Could not create access token",
         )
 
-# Also update the startup and shutdown events
-@app.on_event("startup")
-async def startup_event():
-    # Temporarily disable scheduler
-    # get_scheduler()
-    pass
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    # Temporarily disable scheduler
-    # if scheduler:
-    #     scheduler.shutdown()
-    pass
-
-# Comment out the get_scheduler function 
-# def get_scheduler():
-#     global scheduler
-#     if scheduler is None:
-#         db = SessionLocal()
-#         scheduler = TopicStreamScheduler(db)
-#     return scheduler
-
 @app.post("/topic-streams/", response_model=TopicStreamResponse)
 async def create_topic_stream(
     topic_stream: TopicStreamCreate,
@@ -465,16 +480,24 @@ async def create_topic_stream(
             recency_filter=topic_stream.recency_filter,
             system_prompt=topic_stream.system_prompt,
             temperature=topic_stream.temperature,
-            context_history_level=context_hist_level_enum
+            context_history_level=context_hist_level_enum,
+            auto_update_enabled=topic_stream.auto_update_enabled
         )
 
         db.add(db_topic_stream)
         db.commit()
         db.refresh(db_topic_stream)
 
-        # scheduler_instance = get_scheduler() # If scheduler is re-enabled
-        # scheduler_instance.schedule_topic_stream(db_topic_stream)
-        logger.debug("Scheduled topic stream updates (if scheduler active)")
+        # Re-enable scheduler interaction - uncomment
+        scheduler_instance = get_scheduler() 
+        if scheduler_instance and db_topic_stream.auto_update_enabled: # Check auto_update_enabled
+            # The scheduler's schedule_topic_stream method includes logic to run immediately for new streams
+            scheduler_instance.schedule_topic_stream(db_topic_stream)
+            logger.debug(f"Scheduled topic stream updates for new stream ID: {db_topic_stream.id} because auto-update is enabled.")
+        elif not db_topic_stream.auto_update_enabled:
+            logger.debug(f"New stream ID: {db_topic_stream.id} created with auto-update disabled. Not scheduling.")
+        else:
+            logger.error("Scheduler not available, cannot schedule new stream.")
 
         await perform_search_and_create_summary(db, db_topic_stream) # Initial summary
         db.refresh(db_topic_stream) # Refresh again for last_updated
@@ -526,11 +549,16 @@ async def get_topic_streams(
                 "system_prompt": stream.system_prompt,
                 "temperature": stream.temperature,
                 "context_history_level": stream.context_history_level.value if isinstance(stream.context_history_level, Enum) else stream.context_history_level,
-                "total_stored_est_tokens": total_est_tokens # Include the calculated value
+                "total_stored_est_tokens": total_est_tokens, # Include the calculated value
+                "auto_update_enabled": stream.auto_update_enabled # --- ADDED THIS LINE ---
             }
-            result.append(stream_response_data)
             
-            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream_response_data['model_type']}, Total Stored Tokens: {total_est_tokens}")
+            # result.append(stream_response_data) # Assuming FastAPI will validate against ResponseModel
+            # Alternatively, explicitly create the Pydantic model instance if needed:
+            validated_stream_data = TopicStreamResponse(**stream_response_data)
+            result.append(validated_stream_data) # Append the Pydantic model instance
+            
+            logger.debug(f"Stream: ID={stream.id}, Query={stream.query}, Model={stream_response_data['model_type']}, Total Stored Tokens: {total_est_tokens}, Auto Update Enabled: {stream_response_data['auto_update_enabled']}")
             
         return result
     except Exception as e:
@@ -617,35 +645,34 @@ def get_topic_stream_summaries(
         # Re-raise as HTTPException to return to the frontend
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while fetching summaries: {str(e)}")
 
-@app.delete("/topic-streams/{topic_stream_id}")
+@app.delete("/topic-streams/{topic_stream_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_topic_stream(
     topic_stream_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    try:
-        topic_stream = db.query(TopicStream).filter(
-            TopicStream.id == topic_stream_id,
-            TopicStream.user_id == current_user.id
-        ).first()
-        
-        if not topic_stream:
-            logger.warning(f"Attempt to delete non-existent or unauthorized topic stream ID: {topic_stream_id} by user ID: {current_user.id}")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic stream not found or you do not have permission to delete it.")
-        
-        # Temporarily disable scheduler interaction
-        # if scheduler:
-        #     scheduler.remove_topic_stream(topic_stream_id)
-        
-        db.delete(topic_stream)
-        db.commit()
-        logger.info(f"Successfully deleted topic stream ID: {topic_stream_id} by user ID: {current_user.id}")
-        return {"message": "Topic stream deleted successfully"}
-    except HTTPException as http_exc: # Re-raise HTTPException to preserve status code and details
-        raise http_exc
-    except Exception as e:
-        logger.error(f"Error deleting topic stream ID: {topic_stream_id} by user ID: {current_user.id}. Error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred while deleting the topic stream: {str(e)}")
+    logger.info(f"Received request to delete topic stream ID: {topic_stream_id}")
+    topic_stream = db.query(TopicStream).filter(
+        TopicStream.id == topic_stream_id,
+        TopicStream.user_id == current_user.id
+    ).first()
+    
+    if not topic_stream:
+        logger.warning(f"Topic stream ID: {topic_stream_id} not found for deletion.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic stream not found")
+
+    # Temporarily disable scheduler interaction - uncomment
+    if scheduler: # Check if the global scheduler is initialized
+        scheduler.remove_topic_stream(topic_stream_id) # Use topic_stream.id
+        logger.info(f"Removed topic stream ID: {topic_stream.id} from scheduler.")
+    else:
+        logger.warning(f"Scheduler not available, could not remove job for stream ID: {topic_stream.id}")
+
+    db.delete(topic_stream)
+    db.commit()
+    logger.info(f"Deleted topic stream ID: {topic_stream_id}.")
+
+    return {"detail": "Topic stream deleted successfully"}
 
 @app.post("/topic-streams/{topic_stream_id}/update-now", response_model=SummaryResponse)
 async def update_topic_stream_now(
@@ -877,23 +904,39 @@ async def update_topic_stream(
 
         logger.debug(f"Updating topic stream {topic_stream_id} with data: {topic_stream_data}")
 
-        db_topic_stream.query = topic_stream_data.query
-        db_topic_stream.update_frequency = UpdateFrequency(topic_stream_data.update_frequency)
-        db_topic_stream.detail_level = DetailLevel(topic_stream_data.detail_level)
-        if topic_stream_data.model_type == "r1-1776":
-            db_topic_stream.model_type = ModelType.R1_1776
-        else:
-            db_topic_stream.model_type = ModelType(topic_stream_data.model_type)
-        db_topic_stream.recency_filter = topic_stream_data.recency_filter
-        db_topic_stream.system_prompt = topic_stream_data.system_prompt
-        db_topic_stream.temperature = topic_stream_data.temperature
-
-        if topic_stream_data.context_history_level: # Check if provided in payload
-            db_topic_stream.context_history_level = ContextHistoryLevel(topic_stream_data.context_history_level)
+        # Update model fields from payload if provided (excluding id and user_id)
+        for field, value in topic_stream_data.dict(exclude_unset=True).items():
+            if field == 'update_frequency':
+                setattr(db_topic_stream, field, UpdateFrequency(value))
+            elif field == 'detail_level':
+                 setattr(db_topic_stream, field, DetailLevel(value))
+            elif field == 'model_type':
+                 setattr(db_topic_stream, field, ModelType.R1_1776 if value == "r1-1776" else ModelType(value))
+            elif field == 'context_history_level':
+                 setattr(db_topic_stream, field, ContextHistoryLevel(value))
+            elif field == 'auto_update_enabled':
+                # Ensure the value is a boolean
+                bool_value = bool(value)
+                setattr(db_topic_stream, field, bool_value)
+                logger.info(f"Updating stream {db_topic_stream.id} auto_update_enabled to: {bool_value}")
+            else:
+                setattr(db_topic_stream, field, value)
 
         db.commit()
         db.refresh(db_topic_stream)
-        logger.debug(f"Successfully updated topic stream {topic_stream_id}")
+
+        # Add logic to interact with the scheduler based on auto_update_enabled
+        scheduler_instance = get_scheduler()
+        if scheduler_instance:
+            if db_topic_stream.auto_update_enabled:
+                logger.info(f"Stream {db_topic_stream.id} updated with auto-update enabled. Re-scheduling.")
+                scheduler_instance.schedule_topic_stream(db_topic_stream)
+            else:
+                logger.info(f"Stream {db_topic_stream.id} updated with auto-update disabled. Removing from schedule.")
+                scheduler_instance.remove_topic_stream(db_topic_stream.id)
+        else:
+            logger.error("Scheduler not available, cannot interact with schedule during update.")
+
         return db_topic_stream
     except ValueError as e:
         logger.error(f"ValueError: {str(e)}")

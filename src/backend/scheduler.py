@@ -4,7 +4,7 @@ import time
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
-from models import TopicStream, UpdateFrequency, Summary, DetailLevel, ModelType
+from models import TopicStream, UpdateFrequency, Summary, DetailLevel, ModelType, ContextHistoryLevel
 from perplexity_api import PerplexityAPI, APIError, APIClientError, APIServerError, APINetworkError
 from database import SessionLocal
 import schedule
@@ -12,32 +12,38 @@ import sys
 from pathlib import Path
 import threading
 import json
+import asyncio
 
 logger = logging.getLogger(__name__)
 
 class TopicStreamScheduler:
-    MAX_RETRIES = 3
-    RETRY_DELAY_SECONDS = 5 # Simple delay, could use backoff
-    
-    def __init__(self, db: Session):
-        self.perplexity_api = PerplexityAPI()
-        self.db = db
+    def __init__(self, db_session_factory, update_function_coro):
+        self.db_session_factory = db_session_factory
+        self.update_function_coro = update_function_coro
         self.scheduler = schedule.Scheduler()
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._run_scheduler, daemon=True)
-        self.load_and_schedule_existing_streams()
-        self.thread.start()
         
-    def load_and_schedule_existing_streams(self):
+        self.scheduler.clear()
+        logger.info("[Scheduler] Cleared all existing jobs on initialization.")
+
+        db_for_load = self.db_session_factory()
+        try:
+            self.load_and_schedule_existing_streams(db_for_load)
+        finally:
+            db_for_load.close()
+            
+        self.thread.start()
+
+    def load_and_schedule_existing_streams(self, db):
         logger.info("Loading and scheduling existing topic streams...")
         try:
-            streams = self.db.query(TopicStream).all()
+            streams = db.query(TopicStream).filter(TopicStream.auto_update_enabled == True).all()
             for stream in streams:
                 self.schedule_topic_stream(stream)
-            logger.info(f"Scheduled {len(streams)} existing streams.")
+            logger.info(f"[Scheduler] Found {len(streams)} streams with auto-update enabled to load and schedule.")
         except Exception as e:
-            logger.error(f"Error loading existing streams: {e}", exc_info=True)
-            # If DB connection fails here, scheduler might not start properly
+            logger.error(f"[Scheduler] Error loading existing streams: {e}", exc_info=True)
 
     def get_db(self):
         db = SessionLocal()
@@ -123,59 +129,82 @@ class TopicStreamScheduler:
             return 500
 
     def schedule_topic_stream(self, topic_stream: TopicStream):
+        if not topic_stream.auto_update_enabled:
+            logger.info(f"[Scheduler] Stream {topic_stream.id} ('{topic_stream.query[:30]}...') has auto-update disabled. Ensuring it's removed from schedule.")
+            self.remove_topic_stream(topic_stream.id) 
+            return
+
         interval_seconds = self._get_interval(topic_stream.update_frequency)
         job_id = str(topic_stream.id)
-        logger.info(f"Scheduling topic stream {topic_stream.id} with interval {interval_seconds} seconds")
         
-        # Remove existing job if it exists to prevent duplicates
-        self.scheduler.cancel_job(job_id)
+        self.scheduler.clear(job_id)
+        logger.info(f"[Scheduler] Scheduling stream {topic_stream.id} ('{topic_stream.query[:30]}...') every {interval_seconds}s. Job ID: {job_id}")
         
-        # Schedule the job
         self.scheduler.every(interval_seconds).seconds.do(
-            self._run_with_session, self.update_topic_stream, topic_stream.id
+            self._scheduled_update_job, stream_id=topic_stream.id
         ).tag(job_id)
-        
-        # Run immediately upon scheduling for new streams
-        # Use a separate thread to avoid blocking the main scheduling logic
-        threading.Thread(target=self._run_with_session, args=(self.update_topic_stream, topic_stream.id)).start()
 
     def remove_topic_stream(self, stream_id: int):
         job_id = str(stream_id)
-        logger.info(f"Removing scheduled job for topic stream {stream_id}")
         self.scheduler.clear(job_id)
+        logger.info(f"Removed job for stream ID: {job_id} from scheduler.")
 
     def _get_interval(self, frequency: UpdateFrequency) -> int:
+        # Map UpdateFrequency enum to seconds
         if frequency == UpdateFrequency.HOURLY:
-            return 3600
+            # Reverted change: Set back to 3600 seconds (1 hour)
+            return 3600 # 1 hour
         elif frequency == UpdateFrequency.DAILY:
-            return 86400
+            return 24 * 60 * 60
         elif frequency == UpdateFrequency.WEEKLY:
-            return 604800
+            return 7 * 24 * 60 * 60
         else:
-            return 86400 # Default to daily
-            
-    def _run_with_session(self, func, *args):
-        """Creates a new DB session for a scheduled job."""
-        db = SessionLocal()
+            logger.warning(f"Unknown update frequency: {frequency}. Defaulting to Daily.")
+            return 24 * 60 * 60
+
+    def _scheduled_update_job(self, stream_id: int):
+        db = self.db_session_factory()
         try:
-            func(*args, db=db)
+            logger.info(f"[Scheduler] Job starting for stream ID: {stream_id}")
+            topic_stream = db.query(TopicStream).filter(TopicStream.id == stream_id).first()
+
+            if not topic_stream or not topic_stream.auto_update_enabled:
+                if not topic_stream:
+                     logger.warning(f"[Scheduler] Job: Topic stream {stream_id} not found for scheduled update. Removing job.")
+                else:
+                     logger.info(f"[Scheduler] Job: Stream {stream_id} ('{topic_stream.query[:30]}...') auto-update is now disabled during job execution. Skipping update and removing job.")
+
+                self.remove_topic_stream(stream_id)
+                return
+
+            logger.info(f"[Scheduler] JOB EXECUTING for stream ID: {stream_id} ('{topic_stream.query[:30]}...') ... Actual DB Frequency for this run: {topic_stream.update_frequency.value}")
+
+            asyncio.run(self.update_function_coro(db, topic_stream, ignore_all_previous_summaries_override=False))
+            logger.info(f"[Scheduler] Scheduled update processed for topic stream {topic_stream.id}: {topic_stream.query[:30]}...")
+
         except Exception as e:
-            logger.error(f"Error in scheduled job {func.__name__} with args {args}: {e}", exc_info=True)
+             logger.error(f"[Scheduler] Error in _scheduled_update_job for stream ID {stream_id}: {e}", exc_info=True)
         finally:
             db.close()
+            logger.debug(f"[Scheduler] DB session closed for scheduled job of stream ID: {stream_id}")
 
     def _run_scheduler(self):
         logger.info("Scheduler thread started.")
         while not self.stop_event.is_set():
             self.scheduler.run_pending()
-            time.sleep(1)
+            sleep_duration = self.scheduler.idle_seconds
+            if sleep_duration is not None and sleep_duration > 0:
+                time.sleep(min(sleep_duration, 60))
+            else:
+                time.sleep(1)
         logger.info("Scheduler thread stopped.")
 
     def shutdown(self):
-        logger.info("Shutting down scheduler...")
+        logger.info("Shutting down scheduler thread.")
         self.stop_event.set()
-        self.thread.join()
-        logger.info("Scheduler shut down.")
+        if self.thread.is_alive():
+            self.thread.join()
+        logger.info("Scheduler thread shut down.")
 
     def cleanup_old_summaries(self, max_summaries_per_stream: int = 10):
         """
