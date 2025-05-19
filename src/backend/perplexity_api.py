@@ -344,12 +344,13 @@ class PerplexityAPI:
 
         try:
             self._check_rate_limit() # Check rate limit before making the call
-            result = await self._make_request("chat/completions", payload, timeout_seconds=current_timeout_seconds)
-            logger.debug(f"Received API response: {json.dumps(result)[:200]}...")
+            # raw_api_result is the full JSON response from Perplexity
+            raw_api_result = await self._make_request("chat/completions", payload, timeout_seconds=current_timeout_seconds)
+            logger.debug(f"Received API response (first 200 chars): {json.dumps(raw_api_result)[:200]}...") # Log a snippet
             
             # Extract relevant parts
-            if result and result.get('choices') and len(result['choices']) > 0:
-                choice = result['choices'][0]
+            if raw_api_result and raw_api_result.get('choices') and len(raw_api_result['choices']) > 0:
+                choice = raw_api_result['choices'][0]
                 message = choice.get('message', {})
                 content = message.get('content', '')
                 logger.debug(f"Extracted content from API response, length: {len(content)}")
@@ -372,7 +373,7 @@ class PerplexityAPI:
                     content = "No new information is available since the last update."
                 
                 # Attempt to extract citations from API response if available
-                raw_citations = result.get("citations") or choice.get("citations")
+                raw_citations = raw_api_result.get("citations") or choice.get("citations")
                 sources_list = []
                 if isinstance(raw_citations, list) and raw_citations:
                     for cit in raw_citations:
@@ -393,24 +394,30 @@ class PerplexityAPI:
                     sources_list = []
                     logger.info("Sources list cleared for R1-1776 model")
                 
-                # Return detailed response with list of sources
+                # Extract and include the 'usage' object
+                api_usage_stats = raw_api_result.get("usage", {}) # Get the whole usage object
+
+                # Return detailed response including usage
                 return {
                     "answer": content,
                     "sources": sources_list,
-                    "model": model,
-                    "query": query,
-                    "recency_filter": recency_filter,
-                    "timestamp": datetime.utcnow().isoformat()
+                    "model": raw_api_result.get("model", model), # Use model reported by API if available
+                    "query": query, # This was the input query to search_perplexity
+                    "recency_filter": recency_filter, # This was the input recency filter
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "usage": api_usage_stats # Pass the extracted usage object
                 }
             else:
-                logger.warning(f"Unexpected API response structure: {result}")
-                return {"answer": "", "sources": json.dumps([])}
+                logger.warning(f"Unexpected API response structure: {raw_api_result}")
+                # Return empty usage object if response structure is not as expected
+                return {"answer": "Error: Could not process API response.", "sources": [], "usage": {}}
                  
         except APIError as e:
             logger.error(f"Perplexity API Error: {e}")
             raise # Re-raise specific API errors
         except Exception as e:
             logger.error(f"Unexpected error during Perplexity API call: {e}", exc_info=True)
+            # Ensure a dictionary with a 'usage' key is returned even on error for consistent handling
             raise APIProcessingError(f"Error processing Perplexity API response: {e}")
 
     def _extract_sources_from_content(self, content: str) -> List[str]:
