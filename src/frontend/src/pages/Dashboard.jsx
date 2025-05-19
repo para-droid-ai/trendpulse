@@ -31,7 +31,7 @@ const Dashboard = () => {
   const [lastViewed, setLastViewed] = useState({}); // State to hold last viewed timestamps { streamId: timestamp }
   const [sortBy, setSortBy] = useState('last_updated'); // 'last_updated'
   const [sortDirection, setSortDirection] = useState('desc'); // 'asc' or 'desc'
-  const [sortMode, setSortMode] = useState('manual'); // 'manual' or 'last_updated'
+  const [sortMode, setSortMode] = useState('last_updated'); // Default to last_updated
   
   // Function to toggle between view modes
   const toggleViewMode = () => {

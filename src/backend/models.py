@@ -52,7 +52,7 @@ class TopicStream(Base):
     model_type = Column(SQLEnum(ModelType, name="modeltype_enum", native_enum=False), nullable=False, default=ModelType.SONAR_REASONING, server_default=ModelType.SONAR_REASONING.value)
     
     recency_filter = Column(String, nullable=False, default="1d", server_default="1d") # Added nullable=False and defaults
-    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) # Added onupdate
+    last_updated = Column(DateTime, nullable=True, default=None)
     system_prompt = Column(Text, nullable=True)
     
     temperature = Column(Float, 
