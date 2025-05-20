@@ -578,9 +578,9 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-black dark:text-white font-medium">
                       {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
                     </span>
-                    {/* Model Badge - Ensure model_type exists before rendering */}
-                    {summary.model_type && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-black bg-[#6495ed] dark:text-black">{summary.model_type}</span>
+                    {/* Model Badge - Ensure model exists before rendering */}
+                    {summary.model && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-black bg-[#6495ed] dark:text-black">{summary.model}</span>
                     )}
 
                     {/* Summary Actions - Deep Dive Chat and Delete */}
