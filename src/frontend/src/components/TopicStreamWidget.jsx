@@ -472,16 +472,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
             </div>
 
             {/* Token count for List View - Below buttons, inside header, right aligned */}
-            {/* Removed this block as the new grid view section will handle tokens */}
-            {/*
             {!isGridView && (totalStoredEstTokens > 0 || !loading) && (
-              <div className="flex justify-end mt-2"> /--* Container to align tag to the right *--/
+              <div className="flex justify-end mt-2"> {/* Container to align tag to the right */}
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
                   Estimated Stream Tokens: {totalStoredEstTokens}
                 </span>
               </div>
             )}
-            */}
 
             {/* Action buttons and Token count for Grid View */}
             {isGridView && (
