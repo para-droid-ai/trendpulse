@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { topicStreamAPI } from '../services/api';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
-import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import { formatInTimeZone, utcToZonedTime as toZonedTime } from 'date-fns-tz';
 import DeepDiveChat from './DeepDiveChat';
 import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
@@ -58,39 +58,40 @@ const localeWithAbbreviation = {
     options: {},
 };
 
-const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
-  const [summaries, setSummaries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [expandedSummaryId, setExpandedSummaryId] = useState(null);
-  const [showDeepDive, setShowDeepDive] = useState(false);
+const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView = false }) => {
+  // Add animation state
+  const [animateIn, setAnimateIn] = useState(false);
+  
+  // Component states
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const [selectedSummary, setSelectedSummary] = useState(null);
-  const [showEditForm, setShowEditForm] = useState(false);
-  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [summaries, setSummaries] = useState([]);
+  const [loadingSummaries, setLoadingSummaries] = useState(true);
+  const [apiError, setApiError] = useState('');
+  const [expandedSummaryId, setExpandedSummaryId] = useState(null);
+  const [showDeepDiveChat, setShowDeepDiveChat] = useState(false);
+  const [selectedSummaryId, setSelectedSummaryId] = useState(null);
+  const { theme } = useTheme();
+  
+  // Add missing state declarations
+  const [totalStoredEstTokens, setTotalStoredEstTokens] = useState(0);
   const [copyFeedback, setCopyFeedback] = useState('');
 
-  // State for deleting the WHOLE stream (keep existing)
-  const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
-
-  // State for token count
-  const [totalStoredEstTokens, setTotalStoredEstTokens] = useState(stream.total_stored_est_tokens || 0);
-
-  const theme = useTheme();
-
+  // Trigger animation on mount
   useEffect(() => {
-    fetchSummaries();
-  }, [stream.id]);
+    const timer = setTimeout(() => {
+      setAnimateIn(true);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
-  // Update total stored tokens when the stream prop changes (e.g., after update)
-  useEffect(() => {
-    setTotalStoredEstTokens(stream.total_stored_est_tokens || 0);
-  }, [stream.total_stored_est_tokens]);
-
-  const fetchSummaries = async () => {
+  // Function to fetch summaries
+  const fetchSummaries = useCallback(async () => {
     try {
-      setLoading(true);
-      setError('');
+      setLoadingSummaries(true);
+      setApiError('');
       const data = await topicStreamAPI.getSummaries(stream.id);
       // Map summaries to explicitly include model_type from the stream
       const summariesWithModel = data.map(summary => ({
@@ -101,52 +102,61 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
       console.log('Fetched summaries data:', data);
     } catch (err) {
       console.error('Failed to load summaries:', err);
-      setError('Failed to load summaries. Please try refreshing.');
+      setApiError('Failed to load summaries. Please try refreshing.');
     } finally {
-      setLoading(false);
+      setLoadingSummaries(false);
     }
-  };
+  }, [stream.id]);
+
+  useEffect(() => {
+    fetchSummaries();
+  }, [stream.id]);
+
+  // Update total stored tokens when the stream prop changes (e.g., after update)
+  useEffect(() => {
+    setTotalStoredEstTokens(stream.total_stored_est_tokens || 0);
+  }, [stream.total_stored_est_tokens]);
 
   const handleUpdateNow = async () => {
     try {
       setUpdating(true);
-      setError('');
+      setApiError('');
 
       const newSummary = await topicStreamAPI.updateNow(stream.id);
 
       if (newSummary.content && newSummary.content.includes("No new information is available")) {
-        setError('No new information is available since the last update.');
+        setApiError('No new information is available since the last update.');
       } else {
         setSummaries([newSummary, ...summaries]);
       }
     } catch (err) {
       console.error('Failed to update stream:', err);
-      setError(err.message || 'Failed to update stream. Please try again.');
+      setApiError(err.message || 'Failed to update stream. Please try again.');
     } finally {
       setUpdating(false);
     }
   };
 
   const handleDeleteStream = () => {
-    setShowDeleteStreamConfirm(true);
+    setShowConfirmDelete(true);
   };
 
   const confirmDeleteStream = () => {
     onDelete(stream.id);
-    setShowDeleteStreamConfirm(false);
+    setShowConfirmDelete(false);
   };
 
   const cancelDeleteStream = () => {
-    setShowDeleteStreamConfirm(false);
+    setShowConfirmDelete(false);
   };
 
   const handleSummarySuccessfullyDeleted = (deletedSummaryId) => {
     setSummaries(prevSummaries => prevSummaries.filter(s => s.id !== deletedSummaryId));
-    setError('');
+    setApiError('');
   };
 
   const handleSummaryDeletionError = (errorMessage) => {
-    setError(errorMessage);
+    setApiError(errorMessage);
   };
 
   const handleAppendSummary = (newSummary) => {
@@ -154,8 +164,8 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   };
 
   const handleDeepDive = (summary) => {
-    setSelectedSummary(summary);
-    setShowDeepDive(true);
+    setSelectedSummaryId(summary.id);
+    setShowDeepDiveChat(true);
   };
 
   const toggleExpandSummary = (id) => {
@@ -167,17 +177,17 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   };
 
   const handleEdit = () => {
-    setShowEditForm(true);
+    setEditMode(true);
   };
 
   const handleEditSubmit = async (formData) => {
     try {
       await onUpdate(stream.id, formData);
-      setShowEditForm(false);
-      setError('');
+      setEditMode(false);
+      setApiError('');
     } catch (err) {
       console.error('Failed to update stream:', err);
-      setError(err.message || 'Failed to update stream. Please try again.');
+      setApiError(err.message || 'Failed to update stream. Please try again.');
     }
   };
 
@@ -344,272 +354,205 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     : 'Never updated';
 
   return (
-    <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-card border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200`}>
-      {showEditForm ? (
-        <div className="p-4 bg-card">
-          <h3 className="text-lg font-medium text-foreground mb-4">Edit Topic Stream</h3>
-          <div className="text-xs text-muted-foreground mb-4">Stream ID: {stream.id}</div>
+    <div 
+      className={`${
+        isGridView ? 'h-full' : ''
+      } bg-card rounded-lg shadow-sm border border-border overflow-hidden transition-all duration-300 ease-in-out transform ${
+        animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+      }`}
+    >
+      {/* Stream header */}
+      <div className="relative">
+        <div className="p-4 border-b border-border bg-card sticky top-0 z-10">
+          <div className="flex items-start justify-between">
+            <div className="mr-2 flex-1">
+              {editMode ? (
           <TopicStreamForm
             initialData={stream}
             onSubmit={handleEditSubmit}
-            onCancel={() => setShowEditForm(false)}
+                  onCancel={() => setEditMode(false)}
             isEditing={true}
           />
-        </div>
       ) : (
-        <>
-          <div className="p-4 border-b border-border flex flex-col">
-            <div className="flex justify-between items-start">
-              <div className={`${isGridView ? 'w-full' : 'flex-1 min-w-0 mr-4'}`}>
-                <h3 className={`text-lg font-semibold text-foreground ${isGridView ? 'line-clamp-3' : 'truncate'}`}>
+                <h2 
+                  className="text-lg font-semibold text-foreground mb-1 line-clamp-2 transition-all duration-300" 
+                  title={stream.query}
+                >
                    {stream.query}
-                 </h3>
-                 {/* Tags and timestamp - Render based on isGridView */}
-                 <div className="flex flex-wrap gap-2 mt-2"> {/* Consistent tag layout */}
-                   {stream.update_frequency && (
-                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
+                </h2>
+              )}
+              
+              <div className="flex flex-wrap gap-2 mt-2 transition-all duration-300 ease-in-out">
+                {/* Badges */}
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground transition-all duration-300 ease-in-out transform hover:scale-105">
                        {stream.update_frequency}
                      </span>
-                   )}
-                   {/* Detail Level Badge */}
-                   {stream.detail_level && (
-                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#25b6a5] dark:text-black">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground transition-all duration-300 ease-in-out transform hover:scale-105">
                        {stream.detail_level}
                      </span>
-                   )}
-                   {/* Model Badge */}
-                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#6495ed] flex-shrink-0 dark:text-black">{/* flex-shrink-0 */}
-                     {stream.model_type}
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground transition-all duration-300 ease-in-out transform hover:scale-105">
+                  Model: {stream.model || 'sonar-small-chat'}
                    </span>
-                   {/* Time Since Last Update - Keep with other badges */}
-                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#818cf8] dark:text-black">
-                     {timeSinceLastUpdate}
-                   </span>
-                   {/* --- CONSOLIDATED AUTO-UPDATE BADGE --- */}
-                   {!stream.auto_update_enabled && (
-                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                       Auto-Updates Off
+                
+                {/* Last updated info */}
+                {stream.last_updated && (
+                  <span 
+                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-foreground bg-muted transition-all duration-300 ease-in-out transform hover:scale-105" 
+                    title={`Last updated: ${formatInTimeZone(toZonedTime(new Date(stream.last_updated), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a')}`}
+                  >
+                    Updated: {formatInTimeZone(toZonedTime(new Date(stream.last_updated), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, h:mm a')}
                      </span>
                    )}
-                   {/* --- END CONSOLIDATED BADGE --- */}
                  </div>
                </div>
 
-               {/* Action Buttons - Render based on isGridView */}
-               {!isGridView && (
-                 <div className="flex space-x-1 items-center relative flex-shrink-0 justify-end"> {/* Show only in non-grid view, aligned right */}
-                   {/* Edit Button */}
+            {/* Action buttons */}
+            <div className="flex flex-shrink-0 space-x-2 transition-all duration-300 ease-in-out">
                    <button
-                     onClick={handleEdit}
-                     className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
-                     title="Edit Stream"
-                   >
-                      {/* Pencil Icon */}
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                className="p-2 text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted rounded transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
+                onClick={() => setShowSettings(true)}
+                title="Stream settings"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                       </svg>
                     </button>
-
-                    {/* Update Now Button */}
                     <button
+                className="p-2 text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted rounded transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={handleUpdateNow}
                       disabled={updating}
-                      className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      title={updating ? 'Updating...' : 'Update Now'}
-                    >
-                       {/* Using SVG file from public folder */}
-                       <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
+                title="Update now"
+              >
+                {updating ? (
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
                      </button>
+            </div>
+          </div>
 
-                     {/* Delete Button */}
+          {/* Settings panel */}
+          {showSettings && (
+            <div className="mt-2 py-2 px-2 rounded bg-muted animate-bounce-in">
+              <div className="flex flex-wrap gap-2">
                      <button
-                       onClick={handleDeleteStream}
-                       className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                       title="Delete Stream"
-                     >
-                        {/* Using trashcan SVG file from public folder */}
-                        <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
-                      </button>
-
-                      {/* Export Button */}
-                      <button
-                        onClick={() => setShowExportOptions(!showExportOptions)}
-                        className="py-1 px-2 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors text-xs"
-                      >
-                        Export
-                      </button>
-
-                      {/* Export Options Dropdown */}
-                      {showExportOptions && (
-                        <div className="absolute right-0 top-full mt-1 w-48 bg-popover rounded-md shadow-lg z-10"> {/* Position relative to button */}
-                          <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                            <button
-                              onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
-                              className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                              role="menuitem"
+                  onClick={() => {
+                    setShowSettings(false);
+                    setEditMode(true);
+                  }}
+                  className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded text-foreground transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
                             >
-                              Copy to Clipboard
+                  Edit
                             </button>
                             <button
-                              onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
-                              className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                              role="menuitem"
+                  onClick={() => {
+                    setShowConfirmDelete(true);
+                    setShowSettings(false);
+                  }}
+                  className="px-2 py-1 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
                             >
-                              Export as .md
-                            </button>
-                            <button
-                              onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
-                              className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                              role="menuitem"
-                            >
-                              Export as .txt
+                  Delete
                             </button>
                           </div>
                         </div>
                       )}
-                    </div>
-               )}
-            </div>
-
-            {/* Token count for List View - Below buttons, inside header, right aligned */}
-            {/* Removed this block as the new grid view section will handle tokens */}
-            {/*
-            {!isGridView && (totalStoredEstTokens > 0 || !loading) && (
-              <div className="flex justify-end mt-2"> /--* Container to align tag to the right *--/
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
-                  Estimated Stream Tokens: {totalStoredEstTokens}
-                </span>
-              </div>
-            )}
-            */}
-
-            {/* Action buttons and Token count for Grid View */}
-            {isGridView && (
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50"> {/* A new line with top border */}
-                {/* Token count for Grid View - Left aligned */}
-                <div> {/* Wrap in a div to allow for future additions here if needed */}
-                  {(totalStoredEstTokens > 0 || !loading) && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
-                      Est. Stream Tokens: {totalStoredEstTokens}
-                    </span>
-                  )}
-                </div>
-
-                {/* Action Buttons for Grid View - Right aligned */}
-                <div className="flex space-x-1 items-center"> {/* Container for the buttons */}
-                  {/* Edit Button */}
+          
+          {/* Confirmation dialog */}
+          {showConfirmDelete && (
+            <div className="mt-2 p-3 border border-destructive bg-destructive/10 text-destructive rounded animate-bounce-in">
+              <p className="text-sm mb-2">Are you sure you want to delete this topic stream?</p>
+              <div className="flex justify-end space-x-2">
                   <button
-                    onClick={handleEdit}
-                    className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
-                    title="Edit Stream"
+                  onClick={() => setShowConfirmDelete(false)}
+                  className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 text-foreground rounded transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
+                  Cancel
                   </button>
-
-                  {/* Update Now Button */}
                   <button
-                    onClick={handleUpdateNow} // Ensure this calls the correct updateNow for the specific stream
-                    disabled={updating}
-                    className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title={updating ? 'Updating...' : 'Update Now'}
-                  >
-                    <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
-                  </button>
-
-                  {/* Delete Stream Button */}
-                  <button
-                    onClick={handleDeleteStream} // This is for deleting the whole stream
-                    className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                    title="Delete Stream"
-                  >
-                    <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
-                  </button>
-
-                  {/* Export Button & Dropdown (simplified for brevity, ensure your existing logic is maintained) */}
-                  <div className="relative"> {/* Added relative positioning for dropdown */}
-                    <button
-                      onClick={() => setShowExportOptions(prev => !prev)} // Toggle export options
-                      className="py-1 px-2 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors text-xs"
-                    >
-                      Export
-                    </button>
-                    {showExportOptions && (
-                      <div className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-20"> {/* Adjusted z-index */}
-                        <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                          <button onClick={() => { copyToClipboard(); setShowExportOptions(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted" role="menuitem">
-                            Copy to Clipboard
-                          </button>
-                          <button onClick={() => { exportAsFile('md'); setShowExportOptions(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted" role="menuitem">
-                            Export as .md
-                          </button>
-                          <button onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted" role="menuitem">
-                            Export as .txt
+                  onClick={() => {
+                    onDelete(stream.id);
+                    setShowConfirmDelete(false);
+                  }}
+                  className="px-2 py-1 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
+                >
+                  Delete
                           </button>
                         </div>
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Error section */}
-          {error && !showDeleteStreamConfirm && (
-            <div className="p-4 bg-destructive/10 border-l-4 border-destructive text-destructive">
-              <p>{error}</p>
-              <button onClick={() => setError('')} className="text-sm underline mt-1 text-destructive-foreground hover:text-destructive/80">Dismiss</button>
+      {/* Summaries section */}
+      <div className="p-4 pt-1">
+        {apiError && (
+          <div className="mb-4 p-3 bg-destructive/10 text-destructive border border-destructive rounded transition-all duration-300 ease-in-out">
+            <p className="text-sm">{apiError}</p>
+            <button
+              onClick={() => setApiError('')}
+              className="float-right font-bold"
+              aria-label="Dismiss error"
+            >
+              ×
+            </button>
             </div>
           )}
 
-          <div className="divide-y divide-border">
-            {loading ? (
-              <div className="p-4 text-center text-muted-foreground">Loading summaries...</div>
-            ) : summaries.length === 0 && !error ? (
-              <div className="p-4 text-center text-muted-foreground">
-                No summaries yet. Click "Update Now" to generate one.
+        {loadingSummaries ? (
+          <div className="flex justify-center items-center py-10">
+            <div className="animate-pulse flex flex-col items-center">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                <svg className="animate-spin h-6 w-6 text-primary/60" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">Loading summaries...</p>
+            </div>
+          </div>
+        ) : summaries.length === 0 ? (
+          <div className="py-8 px-4 text-center animate-bounce-in">
+            <p className="text-muted-foreground">No summaries yet. Click "Update now" to generate your first summary.</p>
               </div>
             ) : (
-              summaries.map((summary) => (
-                <div key={summary.id} className="p-2">
-                  <h4 className="text-md font-medium text-foreground mb-2">Summary</h4>
-                  {/* Timestamp, Model, and Summary Actions */}
-                  <div className="flex flex-wrap gap-2 items-center mb-2">
-                    {/* Timestamp Badge */}
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-black dark:text-white font-medium">
-                      {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
+          <ul className="space-y-6">
+            {summaries.map((summary, index) => (
+              <li 
+                key={summary.id} 
+                className="border-b border-border pb-6 last:border-b-0 last:pb-0 transition-all duration-300 ease-in-out" 
+                style={{
+                  transitionDelay: `${index * 100}ms`,
+                  animation: `slideIn 0.3s ease-out ${index * 100}ms forwards`,
+                  opacity: 0
+                }}
+              >
+                {/* Summary content */}
+                <div className="mb-2 flex justify-between items-start">
+                  <span className="text-xs text-muted-foreground">
+                    {formatInTimeZone(toZonedTime(new Date(summary.created_at), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMMM d, yyyy h:mm a')}
                     </span>
-                    {/* Model Badge - Ensure model_type exists before rendering */}
-                    {summary.model_type && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-black bg-[#6495ed] dark:text-black">{summary.model_type}</span>
-                    )}
 
-                    {/* Summary Actions - Deep Dive Chat and Delete */}
-                    <div className="flex space-x-2 items-center ml-auto pr-1"> {/* Added ml-auto to push to the right */}
                        <button
-                        onClick={() => handleDeepDive(summary)}
-                        className="text-xs p-1 rounded-md text-white bg-[#2ccebb] hover:opacity-90 transition-colors"
-                        title="Deep Dive Chat"
-                      >
-                        <img src="/deepdivechat.svg" alt="Deep Dive Chat" className="h-6 w-6" />
+                    onClick={() => {
+                      setSelectedSummaryId(summary.id);
+                      setShowDeepDiveChat(true);
+                    }}
+                    className="text-xs bg-[#2ccebb] text-white px-2 py-1 rounded-full hover:bg-[#2ccebb]/90 transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
+                  >
+                    Deep Dive Chat
                       </button>
-                       <SummaryDeleteButton
-                        streamId={stream.id}
-                        summaryId={summary.id}
-                        onSummaryDeleted={handleSummarySuccessfullyDeleted}
-                        onError={handleSummaryDeletionError}
-                        isIconOnly={true}
-                      />
                     </div>
-                  </div>
-                  {/* Summary Content */}
-                  <div className="px-2 py-1">
-                    {/* Thoughts (experimental) section */}
+                
+                {/* Thoughts section (if available) */}
                     {summary.thoughts && (
-                      <div className="mb-4 p-3 rounded-md bg-muted dark:bg-[#4b4a49]">
-                        <div className="text-sm font-medium text-muted-foreground mb-2">
+                  <div className="mb-4 p-3 rounded-md bg-muted dark:bg-muted/60 transition-all duration-300 ease-in-out">
+                    <div className="text-sm font-medium text-muted-foreground mb-1">
                           Thoughts (experimental)
                         </div>
                         <div className="prose prose-sm max-w-none dark:prose-invert">
@@ -617,93 +560,64 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                         </div>
                       </div>
                     )}
-                    {/* Removed truncation class and logic */}
-                    <div className={`prose prose-sm max-w-none dark:prose-invert px-2`}>
-                      <MarkdownRenderer content={summary.content || ''} />
-                    </div>
+                
+                {/* Main summary content */}
+                <div className={`prose prose-sm max-w-none dark:prose-invert transition-all duration-300 ease-in-out ${
+                  expandedSummaryId === summary.id ? '' : 'line-clamp-10'
+                }`}>
+                  <MarkdownRenderer content={summary.content} />
                   </div>
 
-                  {/* Summary Sources */}
+                {/* Expand/collapse button */}
+                {summary.content && summary.content.split('\n').length > 10 && (
+                  <button
+                    onClick={() => toggleExpandSummary(summary.id)}
+                    className="text-xs text-muted-foreground hover:text-foreground mt-2 transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
+                  >
+                    {expandedSummaryId === summary.id ? 'Show less' : 'Read more'}
+                  </button>
+                )}
+                
+                {/* Sources section */}
                   {summary.sources && summary.sources.length > 0 && (
-                    <div className="px-2 pb-2">
-                      <div className="text-xs font-medium text-muted-foreground mb-1">Sources:</div>
+                  <div className="mt-4 transition-all duration-300 ease-in-out">
+                    <p className="text-xs text-muted-foreground mb-1">Sources:</p>
                       <div className="flex flex-wrap gap-1">
-                        {summary.sources.map((source, index) => (
+                      {summary.sources.map((source, idx) => (
                           <a
-                            key={index}
-                            href={typeof source === 'string' ? source : (source.url || source.name || source)}
+                          key={idx}
+                          href={typeof source === 'string' ? source : source.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 px-2 py-1 rounded-full truncate max-w-[200px]"
-                            title={typeof source === 'string' ? source : (source.url || source)}
+                          className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 px-2 py-1 rounded-full truncate max-w-[200px] transition-all duration-300 ease-in-out transform hover:scale-105"
+                          title={typeof source === 'string' ? source : source.url || source}
                           >
                             {typeof source === 'string'
-                              ? source
-                              : (source.name || source.url || source)}
+                            ? new URL(source).hostname
+                            : source.name || new URL(source.url).hostname}
                           </a>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  {/* New block to display token statistics - place this after summary content/sources */}
-                  {(summary.prompt_tokens !== null || summary.completion_tokens !== null || summary.total_tokens !== null || summary.estimated_content_tokens !== null) && (
-                    <div className="mt-2 pt-2 border-t border-border/50 px-2 text-xs text-muted-foreground"> {/* Container for both lines */}
-                      
-                      {/* Line 1: API Token Usage */}
-                      {(summary.prompt_tokens !== null || summary.completion_tokens !== null || summary.total_tokens !== null) && (
-                        <div className="flex flex-wrap items-center gap-x-2"> {/* gap-x-2 for space between items */}
-                          <span className="font-semibold text-foreground/80">API Usage:</span> {/* Bolder label */}
-                          
-                          {summary.prompt_tokens !== null && (
-                            <span title="Tokens in the prompt sent to the API (includes query, system prompt, and previous context if any)">
-                              Input: {summary.prompt_tokens}
-                            </span>
-                          )}
-                          
-                          {summary.completion_tokens !== null && (
-                            <>
-                              {summary.prompt_tokens !== null && <span className="text-muted-foreground/60 mx-1">|</span>} {/* Conditional separator */}
-                              <span title="Tokens generated by the AI model as the response content">
-                                Output: {summary.completion_tokens}
-                              </span>
-                            </>
-                          )}
-
-                          {summary.total_tokens !== null && (
-                            <>
-                              {(summary.prompt_tokens !== null || summary.completion_tokens !== null) && <span className="text-muted-foreground/60 mx-1">|</span>} {/* Conditional separator */}
-                              <span title="Total tokens processed by the API for this call (prompt + completion)">
-                                Total: {summary.total_tokens} tokens
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Line 2: Estimated Content Tokens */}
-                      {summary.estimated_content_tokens !== null && (
-                        <div className={`${(summary.prompt_tokens !== null || summary.completion_tokens !== null || summary.total_tokens !== null) ? 'mt-0.5' : ''}`}> {/* Add top margin only if API usage is also shown */}
-                          <span className="text-foreground/80">(Content Est: ~{summary.estimated_content_tokens} tokens)</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
+              </li>
+            ))}
+          </ul>
             )}
           </div>
 
-          {showDeepDive && selectedSummary && (
-            <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center p-4">
-              <div className="bg-card rounded-lg shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col max-w-7xl">
+      {/* Deep Dive Chat modal */}
+      {showDeepDiveChat && selectedSummaryId && (
+        <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center transition-opacity duration-300 ease-in-out animate-fade-in">
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col animate-bounce-in" style={{ maxWidth: '1400px' }}>
+            {/* Modal header */}
                 <div className="p-4 border-b border-border flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-foreground truncate flex-1 min-w-0">
+              <h3 className="text-lg font-medium text-foreground">
                     Deep Dive: {stream.query}
                   </h3>
                   <button
-                    onClick={() => setShowDeepDive(false)}
-                    className="text-muted-foreground hover:text-foreground"
+                onClick={() => setShowDeepDiveChat(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors duration-300 transform hover:rotate-90"
                   >
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -711,76 +625,30 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                   </button>
                 </div>
 
-                {/* Main content area with two columns */}
-                <div className="flex flex-1 overflow-hidden flex-row">
+            {/* Modal content */}
+            <div className="flex overflow-hidden flex-row w-full h-[80vh]">
                   {/* Original Summary Section - Left Column */}
-                  <div className="flex-1 basis-1/2 p-4 border-r border-border overflow-y-auto">
+              <div className="p-4 border-r border-border overflow-y-auto flex-1">
                     <h4 className="text-md font-medium text-foreground mb-2">Original Summary</h4>
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {selectedSummary.created_at ? formatInTimeZone(toZonedTime(parseISO(selectedSummary.created_at), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : ''} • Model: {selectedSummary.model_type}
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <MarkdownRenderer content={summaries.find(s => s.id === selectedSummaryId)?.content || ''} />
                     </div>
-                    <MarkdownRenderer content={selectedSummary.content} />
                   </div>
 
                   {/* Deep Dive Chat Section - Right Column */}
-                  <div className="flex-1 basis-1/2 overflow-hidden">
+              <div className="p-4 border-l border-border overflow-y-auto flex-1">
                     <DeepDiveChat
                       topicStreamId={stream.id}
-                      summaryId={selectedSummary.id}
+                  summaryId={selectedSummaryId}
                       topic={stream.query}
-                      onAppend={handleAppendSummary}
+                  onAppend={() => {
+                    // Handle new summary creation if needed
+                  }}
                     />
                   </div>
                 </div>
               </div>
             </div>
-          )}
-
-          {showDeleteStreamConfirm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75" onClick={cancelDeleteStream}>
-              <div className="bg-card rounded-lg p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
-                <h3
-                  className="text-lg font-medium text-foreground mb-4"
-                  style={{
-                    width: 'calc(100% - 40px)',
-                    maxWidth: 'calc(100% - 40px)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    display: 'block'
-                  }}
-                  title={stream.query}
-                >
-                  Delete Topic Stream: {stream.query}
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  Are you sure you want to delete this topic stream? This action cannot be undone, and all associated summaries will be permanently deleted.
-                </p>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={cancelDeleteStream}
-                    className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-md hover:bg-muted/80"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmDeleteStream}
-                    className="px-4 py-2 text-sm font-medium text-destructive-foreground bg-destructive rounded-md hover:bg-destructive/90"
-                  >
-                    Delete Stream
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Display copy feedback */}
-          {copyFeedback && (
-            <div className="absolute bottom-4 right-4 px-3 py-2 bg-foreground text-background text-sm rounded shadow-lg z-50">
-              {copyFeedback}
-            </div>
-          )}
-        </>
       )}
     </div>
   );
