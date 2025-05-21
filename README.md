@@ -6,11 +6,11 @@ TrendPulse Dashboard is a real-time, customizable web application that empowers 
 
 ![TrendPulse UI-Refresh](docs/DailyFocus_UI-Refresh-05-21-25.gif)
 
-*May 21 2025 UI Refresh by @DailyFocus*
+*May 21 2025 v2.5 UI Refresh by @DailyFocus - coming soon™️*
 
 ![TrendPulse Dashboard Demo](docs/Recording%202025-05-11%20at%2012.14.23.gif)
 
-*Demo showcasing the TrendPulse Dashboard's mobile feed view, with real-time updates and interactive features.*
+*May 11th 2025 v1 TrendPulse Dashboard, showing mobile feed view, list view, and grid view, while Update Stream is run and returns a new summary.*
 
 ## Core Features
 
