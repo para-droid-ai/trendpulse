@@ -272,15 +272,15 @@ class PerplexityAPI:
         detail_map_max_tokens = {
             # Max tokens for non-reasoning models
             "non_reasoning": {
-                "brief": 512,
-                "detailed": 850,
-                "comprehensive": 1200,
+                "brief": 1000,
+                "detailed": 5000,
+                "comprehensive": 8000,
             },
             # Max tokens for reasoning models (to account for thinking tokens)
             "reasoning": {
-                "brief": 2500,
-                "detailed": 5000,
-                "comprehensive": 8000,
+                "brief": 5000,
+                "detailed": 8000,
+                "comprehensive":12000,
             },
         }
 
