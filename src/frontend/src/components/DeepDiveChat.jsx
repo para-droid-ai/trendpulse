@@ -34,7 +34,6 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   const [temperature, setTemperature] = useState(0.4); // Add state for temperature, default 0.4
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
-  const [animateIn, setAnimateIn] = useState(false);
 
   // Load saved messages from localStorage
   useEffect(() => {
@@ -56,14 +55,6 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Trigger animation on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setAnimateIn(true);
-    }, 50);
-    return () => clearTimeout(timer);
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault(); // Prevent default form submission initially
@@ -152,115 +143,186 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
   };
 
   return (
-    <div className={`flex flex-col h-full transition-opacity duration-300 ease-in-out ${animateIn ? 'opacity-100' : 'opacity-0'}`}>
-      <h4 className="text-md font-medium text-foreground mb-4">Deep Dive Chat</h4>
-      <p className="text-sm text-muted-foreground mb-4">
-        Ask follow-up questions about the summary or request more information.
-      </p>
-      
-      {/* Chat messages container with animations */}
-      <div className="flex-1 overflow-y-auto mb-4 pr-2">
-        {messages.map((message, index) => (
-          <div 
-            key={index} 
-            className={`mb-4 ${
-              message.type === 'user' ? 'ml-4' : ''
-            } transition-all duration-300 ease-in-out`}
-            style={{
-              opacity: animateIn ? 1 : 0,
-              transform: animateIn ? 'translateY(0)' : 'translateY(10px)',
-              transitionDelay: `${Math.min(index * 100, 500)}ms`
-            }}
+    <div className="flex flex-col h-full border border-border rounded-lg overflow-hidden">
+      <div className="p-3 border-b border-border bg-card flex justify-between items-center">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Follow-up Questions</h3>
+          <p className="text-xs text-muted-foreground">Ask questions to explore this topic further</p>
+        </div>
+        {messages.length > 0 && (
+          <button
+            onClick={clearChat}
+            className="text-xs text-muted-foreground hover:text-destructive px-2 py-1 rounded"
           >
-            <div
-              className={`p-3 rounded-lg ${
-                message.type === 'user'
-                  ? 'bg-primary text-primary-foreground ml-auto'
-                  : 'bg-muted text-foreground'
-              } ${message.type === 'user' ? 'max-w-[80%] ml-auto' : 'max-w-[80%]'} transition-all duration-300 ease-in-out transform hover:scale-[1.01]`}
-            >
-              <div className="prose prose-sm max-w-none dark:prose-invert">
-                <MarkdownRenderer content={message.content} />
-              </div>
-                </div>
-            </div>
-          ))}
-          {loading && (
-          <div className="flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out animate-bounce-in">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-              <svg className="animate-spin h-4 w-4 text-primary" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
+            Clear Chat
+          </button>
+        )}
       </div>
 
-      {/* Chat input with animations */}
-      <div className="relative transition-all duration-300 ease-in-out transform">
-        <textarea
-          ref={chatContainerRef}
-          className="w-full p-3 border border-border bg-card text-foreground rounded-lg resize-none transition-all duration-300 ease-in-out focus:ring-2 focus:ring-primary focus:border-primary"
-          placeholder="Ask a follow-up question..."
+      <div
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-scroll bg-background p-3"
+      >
+        {messages.length === 0 && !loading && !error && (
+          <div className="text-center text-muted-foreground my-6">
+            <p>Ask a question to learn more about this topic</p>
+          </div>
+        )}
+        
+        <div className="space-y-3">
+          {messages.map(message => (
+            <div key={message.id} className={`p-3 rounded-lg ${message.type==='user'?'bg-muted ml-6':'bg-card mr-6'} shadow-sm`}>
+              <div className="text-sm font-medium mb-1 flex justify-between">
+                <div className="capitalize text-foreground">{message.type==='user'?'You':message.model||'AI'}</div>
+                {message.type==='ai' && message.model && <div className="text-xs text-muted-foreground">Model: {message.model}</div>}
+              </div>
+              
+              {message.type==='user'
+                ? <div className="whitespace-pre-wrap text-foreground text-sm">{message.content}</div>
+                : (
+                  <div className="text-sm">
+                    {/* Summary Content with Read More */}
+                    <div className={`dark:prose-invert overflow-hidden ${!message.isExpanded ? 'line-clamp-10' : ''}`}>
+                      <MarkdownRenderer content={message.content} />
+                    </div>
+                    {message.content && message.content.length > 500 && (
+                      <button
+                        onClick={() => setMessages(prev => prev.map(msg => msg.id === message.id ? { ...msg, isExpanded: !msg.isExpanded } : msg))}
+                        className="mt-2 text-primary hover:underline"
+                      >
+                        {message.isExpanded ? 'Read less' : 'Read more'}
+                      </button>
+                    )}
+
+                    {/* Summary Sources - Moved below summary content */}
+                    {message.sources && message.sources.length > 0 && message.model !== 'r1-1776' && (
+                      <div className="mt-4">
+                        <div className="text-xs font-medium text-muted-foreground mb-1">Sources:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {message.sources.map((src,i)=>(
+                            <a 
+                              key={i} 
+                              href={src} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-xs bg-accent text-accent-foreground px-2 py-1 rounded-full truncate max-w-[200px] hover:bg-accent/80"
+                            >
+                              {src}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              
+              {message.type === 'ai' && (
+                <div className="mt-2 flex justify-end">
+                  <button
+                    onClick={() => handleSaveToStream(message)}
+                    disabled={appendingId === message.id}
+                    className={`px-2 py-1 rounded text-xs bg-primary text-primary-foreground hover:bg-primary/90 ${
+                      appendingId === message.id ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {appendingId === message.id ? 'Adding...' : 'Save to Stream'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {loading && (
+            <div className="flex items-center justify-center my-3">
+              <div className="animate-pulse flex space-x-2">
+                <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+              </div>
+            </div>
+          )}
+          
+          {error && (
+            <div className="text-center text-destructive my-3 p-2 bg-destructive/10 rounded">
+              {error}
+              <button onClick={() => setError('')} className="ml-2 text-xs underline text-destructive-foreground hover:text-destructive/80">Dismiss</button>
+            </div>
+          )}
+          
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      <div className="p-3 border-t border-border bg-card">
+        <form onSubmit={handleSubmit} className="space-y-2">
+          <div className="flex">
+            <input 
+              type="text" 
               value={question} 
-          onChange={e => setQuestion(e.target.value)}
+              onChange={e=>setQuestion(e.target.value)} 
               onKeyDown={handleKeyDown}
-          rows={5}
+              placeholder="Ask a follow-up question..." 
+              className="flex-1 border border-border rounded-l-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring bg-background text-foreground placeholder-muted-foreground" 
               disabled={loading} 
-        ></textarea>
+            />
             <button 
-          className="absolute right-3 bottom-3 p-2 rounded-full bg-primary text-primary-foreground disabled:bg-primary/50 disabled:cursor-not-allowed transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
-          onClick={handleSubmitLogic}
-          disabled={loading || !question.trim()}
+              type="submit" 
+              className={`bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-r-md ${loading?'opacity-75 cursor-not-allowed':''}`}
+              disabled={loading}
             >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
-          </svg>
+              Send
             </button>
           </div>
-      
-      {/* Save summary button with animations */}
-      {!appendingId && messages.length > 1 && (
-        <button
-          onClick={() => handleSaveToStream(messages[messages.length - 1])}
-          className="mt-4 py-2 px-4 bg-muted hover:bg-muted/80 text-foreground rounded-lg flex items-center justify-center transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" />
-          </svg>
-          Save as Summary
-        </button>
-      )}
-      
-      {appendingId && (
-        <div className="mt-4 py-2 px-4 bg-muted text-foreground rounded-lg flex items-center justify-center transition-all duration-300 ease-in-out animate-pulse">
-          <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Saving...
+          <div className="flex items-center justify-end space-x-2">
+            <label htmlFor="model-select" className="text-xs text-muted-foreground">Model:</label>
+            <select 
+              id="model-select"
+              value={selectedModel}
+              onChange={e => setSelectedModel(e.target.value)}
+              disabled={loading}
+              className="text-xs border-border bg-background text-foreground rounded-md shadow-sm focus:border-border focus:ring focus:ring-ring py-1 pl-2 pr-7"
+            >
+              <option value="sonar-reasoning">Sonar Reasoning (Default)</option>
+              <option value="sonar">Sonar</option>
+              <option value="sonar-pro">Sonar Pro</option>
+              <option value="sonar-reasoning-pro">Sonar Reasoning Pro</option>
+              <option value="sonar-deep-research">Sonar Deep Research</option>
+              <option value="r1-1776">R1-1776 (Offline)</option>
+            </select>
           </div>
-      )}
-      
-      {/* Error message with animations */}
-      {error && (
-        <div className="mt-4 p-3 bg-destructive/10 text-destructive border border-destructive rounded-lg transition-all duration-300 ease-in-out animate-bounce-in">
-          <div className="flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <p>{error}</p>
+          {/* Temperature Slider */}
+          <div className="flex items-center justify-end space-x-2">
+            <label htmlFor="temperature-slider" className="text-xs text-muted-foreground">Temperature:</label>
+            <input
+              id="temperature-slider"
+              type="range"
+              min="0" // Minimum temperature
+              max="1" // Maximum temperature
+              step="0.01" // Step value for finer control
+              value={temperature}
+              onChange={e => setTemperature(parseFloat(e.target.value))}
+              disabled={loading}
+              className="w-32"
+            />
+            <span className="text-xs text-muted-foreground w-8 text-right">{temperature.toFixed(2)}</span> {/* Display current temperature */}
           </div>
-          <button
-            onClick={() => setError('')}
-            className="mt-2 text-sm text-destructive hover:text-destructive/90 transition-colors duration-300"
-          >
-            Dismiss
-          </button>
+          <div className="flex items-center mt-2">
+            <input
+              id="with-context-checkbox"
+              type="checkbox"
+              checked={withContext}
+              onChange={e => setWithContext(e.target.checked)}
+              className="mr-2 accent-primary"
+              disabled={loading}
+            />
+            <label htmlFor="with-context-checkbox" className="text-xs text-muted-foreground select-none">
+              Send previous chat context
+              <span className="ml-1 text-muted-foreground" title="If unchecked, only your current question will be sent to the model. Previous chat history will be omitted.">(?)</span>
+            </label>
           </div>
-      )}
+        </form>
+      </div>
     </div>
   );
 };

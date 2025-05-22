@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import DeepDiveChat from '../components/DeepDiveChat';
 import { formatDistanceToNowStrict, parseISO } from 'date-fns';
-import { formatInTimeZone, utcToZonedTime as toZonedTime } from 'date-fns-tz';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -32,30 +32,18 @@ const Dashboard = () => {
   const [sortBy, setSortBy] = useState('last_updated'); // 'last_updated'
   const [sortDirection, setSortDirection] = useState('desc'); // 'asc' or 'desc'
   const [sortMode, setSortMode] = useState('last_updated'); // Default to last_updated
-  const [isTransitioning, setIsTransitioning] = useState(false); // Track transition state
-  const [prevViewMode, setPrevViewMode] = useState(null); // Track previous view mode
   
-  // Modified setViewMode to handle transitions
-  const changeViewMode = (newMode) => {
-    if (viewMode === newMode) return;
+  // Function to toggle between view modes
+  const toggleViewMode = () => {
+    const newMode = viewMode === 'list' ? 'grid' : 
+                   viewMode === 'grid' ? 'mobile' : 'list';
     
-    setPrevViewMode(viewMode);
-    setIsTransitioning(true);
+    setViewMode(newMode);
     
-    // Delay actual view mode change to allow fade out animation
-    setTimeout(() => {
-      setViewMode(newMode);
-      
-      // If switching to mobile view, fetch all summaries
-      if (newMode === 'mobile' && allSummaries.length === 0) {
-        fetchAllSummaries();
-      }
-      
-      // Allow time for content to load before fading in
-      setTimeout(() => {
-        setIsTransitioning(false);
-      }, 50);
-    }, 250);
+    // If switching to mobile view, fetch all summaries
+    if (newMode === 'mobile' && allSummaries.length === 0) {
+      fetchAllSummaries();
+    }
   };
 
   // Get the view mode icon and text based on current mode
@@ -628,32 +616,15 @@ const Dashboard = () => {
             </div>
           )}
           <div className="flex items-center space-x-4">
-            <div className="relative mr-4 h-8 w-[180px]">
-              <div className="bg-muted rounded-full grid grid-cols-3 relative h-full overflow-hidden">
-                <div
-                  className="absolute bg-primary rounded-full h-full w-[60px] transition-transform duration-300 ease-in-out"
-                  style={{ transform: `translateX(${['list','grid','mobile'].indexOf(viewMode) * 60}px)` }}
-                />
-                {[
-                  { mode: 'list', icon: '📋', label: 'List' },
-                  { mode: 'grid', icon: '📊', label: 'Grid' },
-                  { mode: 'mobile', icon: '📱', label: 'Feed' }
-                ].map(({ mode, icon, label }) => (
-                  <button
-                    key={mode}
-                    onClick={() => changeViewMode(mode)}
-                    className="relative z-10 flex items-center justify-center px-3 py-1 w-full h-full transition-colors duration-300 ease-in-out"
-                  >
-                    <span className={viewMode === mode ? 'text-primary-foreground' : 'text-foreground'}>
-                      {label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <button
+              onClick={toggleViewMode}
+              className="mr-4 text-sm px-3 py-1 rounded bg-primary text-primary-foreground border border-primary/50 hover:bg-primary/90 flex items-center"
+            >
+              <span className="mr-1">{viewModeUI.icon}</span> {viewModeUI.text}
+            </button>
             <button
               onClick={toggleTheme}
-              className="mr-4 text-sm px-3 py-1 rounded bg-muted text-muted-foreground border border-border hover:bg-muted/80 transition-colors duration-300"
+              className="mr-4 text-sm px-3 py-1 rounded bg-muted text-muted-foreground border border-border hover:bg-muted/80"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
@@ -661,7 +632,7 @@ const Dashboard = () => {
             <span className="text-xs text-muted-foreground">{user?.email}</span>
             <button 
               onClick={logout}
-              className="text-xs text-muted-foreground hover:text-primary transition-colors duration-300"
+              className="text-xs text-muted-foreground hover:text-primary"
             >
               Sign out
             </button>
@@ -669,11 +640,11 @@ const Dashboard = () => {
         </div>
       </header>
 
-      {/* Main content wrapper with transition */}
-      <main className={`py-6 transition-opacity duration-300 ease-in-out ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+      {/* Main content wrapper for width control */}
+      <main className="py-6">
         <div className={`${viewMode === 'grid' ? 'container-fluid mx-auto' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8`}>
           {error && (
-            <div className="mb-4 bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded transition-all duration-300 ease-in-out" data-testid="error-message">
+            <div className="mb-4 bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded" data-testid="error-message">
               {error}
               <button 
                 className="float-right font-bold"
@@ -686,7 +657,7 @@ const Dashboard = () => {
           )}
 
           {viewMode === 'mobile' ? (
-            <div className="flex flex-col transition-transform duration-300 ease-in-out transform">
+            <div className="flex flex-col">
               {/* Mobile View Header - moved inside the container */}
               {!showForm && topicStreams.length > 0 && !loading && !loadingSummaries && allSummaries.length > 0 ? (
                 <div className="mobile-feed pb-16 max-w-3xl mx-auto">
@@ -694,26 +665,14 @@ const Dashboard = () => {
                     <h2 className="text-xl font-medium text-foreground">Latest Updates</h2>
                     <button
                       onClick={() => setShowForm(true)}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded transition-colors duration-300"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
                     >
                       New Stream
                     </button>
                   </div>
                   
                   {/* Chronological feed of all summaries */}
-                  {allSummaries.map((summary, index) => (
-                    <div 
-                      key={summary.id} 
-                      className="transition-all duration-300 ease-in-out" 
-                      style={{ 
-                        opacity: 1,
-                        transform: 'translateY(0)', 
-                        transitionDelay: `${Math.min(index * 50, 300)}ms` 
-                      }}
-                    >
-                      {renderSummaryItem(summary)}
-                    </div>
-                  ))}
+                  {allSummaries.map(summary => renderSummaryItem(summary))}
                 </div>
               ) : (
                 <>
@@ -722,7 +681,7 @@ const Dashboard = () => {
                     <h2 className="text-xl font-medium text-foreground">Latest Updates</h2>
                     <button
                       onClick={() => setShowForm(true)}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded transition-colors duration-300"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
                     >
                       New Stream
                     </button>
@@ -739,22 +698,22 @@ const Dashboard = () => {
                       <p className="mt-2">Loading your feed...</p>
                     </div>
                   ) : topicStreams.length === 0 ? (
-                    <div className="p-8 text-center bg-card rounded-lg shadow-sm border border-border transition-all duration-300 ease-in-out">
+                    <div className="p-8 text-center bg-card rounded-lg shadow-sm border border-border">
                       <p className="text-muted-foreground mb-4">No topic streams yet. Create your first one!</p>
                       <button
                         onClick={() => setShowForm(true)}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
                       >
                         New Stream
                       </button>
                     </div>
                   ) : showForm ? (
-                    <div className="bg-card rounded-lg shadow-sm p-6 border border-border transition-all duration-300 ease-in-out">
+                    <div className="bg-card rounded-lg shadow-sm p-6 border border-border">
                       <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-medium text-foreground">Create New Topic Stream</h2>
                         <button
                           onClick={() => setShowForm(false)}
-                          className="text-muted-foreground hover:text-foreground transition-colors duration-300"
+                          className="text-muted-foreground hover:text-foreground"
                         >
                           Cancel
                         </button>
@@ -762,7 +721,7 @@ const Dashboard = () => {
                       <TopicStreamForm onSubmit={handleCreateStream} />
                     </div>
                   ) : allSummaries.length === 0 ? (
-                    <div className="p-8 text-center bg-card rounded-lg shadow-sm border border-border transition-all duration-300 ease-in-out">
+                    <div className="p-8 text-center bg-card rounded-lg shadow-sm border border-border">
                       <p className="text-muted-foreground mb-4">No updates in your feed yet.</p>
                       <p className="text-muted-foreground mb-4">Try updating one of your streams to see content here.</p>
                     </div>
@@ -774,14 +733,14 @@ const Dashboard = () => {
             <div className="grid grid-cols-12 gap-6">
               {/* Sidebar: Conditionally render in DOM based on viewMode to simplify layout management */}
               {viewMode === 'list' && (
-                <div className="col-span-12 md:col-span-3 rounded-lg shadow-sm bg-card border border-border sticky top-[69px] max-h-[calc(100vh-69px)] overflow-x-hidden transition-all duration-300 ease-in-out">
+                <div className="col-span-12 md:col-span-3 rounded-lg shadow-sm bg-card border border-border sticky top-[69px] max-h-[calc(100vh-69px)] overflow-x-hidden">
                   <div className="p-4 border-b border-border">
                     {/* Header Row */}
                     <div className="flex justify-between items-center mb-2">
                       <h2 className="text-lg font-medium text-foreground">Topic Streams</h2>
                       <button
                         onClick={() => setShowForm(true)}
-                        className="bg-muted hover:bg-muted/80 text-foreground px-3 py-1 rounded text-sm border border-border transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
+                        className="bg-muted hover:bg-muted/80 text-foreground px-3 py-1 rounded text-sm border border-border"
                         data-testid="new-stream-button"
                       >
                         New Stream
@@ -811,7 +770,7 @@ const Dashboard = () => {
                               setSortMode('manual'); // Switch back to manual if already oldest first
                            }
                         }}
-                        className="mt-2 text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full hover:bg-muted/80 transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
+                        className="mt-2 text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full hover:bg-muted/80"
                       >
                         Sort by: {sortMode === 'manual' ? 'Manual Order' : `Last Updated (${sortDirection === 'desc' ? 'Newest First' : 'Oldest First'})`}
                       </button>
@@ -830,7 +789,7 @@ const Dashboard = () => {
                       </div>
                     ) : (
                       <ul className="divide-y divide-border" data-testid="stream-list">
-                        {topicStreams.map((stream, index) => (
+                        {topicStreams.map(stream => (
                           <li 
                             key={stream.id} 
                             data-testid={`stream-item-${stream.id}`}
@@ -839,11 +798,10 @@ const Dashboard = () => {
                             onDragEnd={handleDragEnd}
                             onDragOver={(e) => handleDragOver(e, stream.id)}
                             onDrop={(e) => handleDrop(e, stream.id)}
-                            className={`${dragOverStreamId === stream.id ? 'border-2 border-primary' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'} transition-all duration-300 ease-in-out`}
-                            style={{ transitionDelay: `${Math.min(index * 30, 200)}ms` }}
+                            className={`${dragOverStreamId === stream.id ? 'border-2 border-primary' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
                           >
                             <button
-                              className={`w-full text-left p-4 hover:bg-muted/50 flex items-center ${selectedStream?.id === stream.id ? 'bg-muted dark:bg-primary/20' : ''} transition-all duration-300 ease-in-out`}
+                              className={`w-full text-left p-4 hover:bg-muted/50 flex items-center ${selectedStream?.id === stream.id ? 'bg-muted dark:bg-primary/20' : ''}`}
                               onClick={() => {
                                 setSelectedStream(stream);
                                 const updatedLastViewed = { ...lastViewed, [stream.id]: new Date().toISOString() };
@@ -874,14 +832,14 @@ const Dashboard = () => {
               )}
 
               {/* Main content area */}
-              <div className={`${viewMode === 'list' ? 'col-span-12 md:col-span-9' : 'col-span-12'} transition-all duration-300 ease-in-out`}>
+              <div className={`${viewMode === 'list' ? 'col-span-12 md:col-span-9' : 'col-span-12'}`}>
                 {showForm ? (
-                  <div className="rounded-lg shadow-sm p-6 bg-card border border-border transition-all duration-300 ease-in-out">
+                  <div className="rounded-lg shadow-sm p-6 bg-card border border-border">
                     <div className="flex justify-between items-center mb-6">
                       <h2 className="text-xl font-medium text-foreground">Create New Topic Stream</h2>
                       <button
                         onClick={() => setShowForm(false)}
-                        className="text-muted-foreground hover:text-foreground transition-colors duration-300"
+                        className="text-muted-foreground hover:text-foreground"
                       >
                         Cancel
                       </button>
@@ -891,18 +849,9 @@ const Dashboard = () => {
                 ) : viewMode === 'grid' ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 auto-rows-auto">
                     {/* We're going to render the top streams first, with consistent heights */}
-                    <div className="col-span-full pb-4 mb-4 flex flex-wrap gap-8 transition-opacity duration-300 ease-in-out">
-                      {topicStreams.slice(0, 5).map((stream, index) => (
-                        <div 
-                          key={stream.id} 
-                          className="flex-1 min-w-[300px] transition-all duration-500 ease-in-out" 
-                          style={{ 
-                            maxWidth: 'calc(25% - 24px)',
-                            opacity: isTransitioning ? 0 : 1,
-                            transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
-                            transitionDelay: `${Math.min(index * 70, 350)}ms`
-                          }}
-                        >
+                    <div className="col-span-full pb-4 mb-4 flex flex-wrap gap-8">
+                      {topicStreams.slice(0, 5).map(stream => (
+                        <div key={stream.id} className="flex-1 min-w-[300px]" style={{ maxWidth: 'calc(25% - 24px)' }}>
                           <TopicStreamWidget
                             stream={stream}
                             onDelete={() => handleDeleteStream(stream.id)}
@@ -915,7 +864,7 @@ const Dashboard = () => {
                     
                     {/* Button to scroll to More Streams - only show if there are more than 5 streams */}
                     {topicStreams.length > 5 && (
-                      <div className="col-span-full text-center mb-4 transition-opacity duration-300 ease-in-out" style={{ opacity: isTransitioning ? 0 : 1, transitionDelay: '400ms' }}>
+                      <div className="col-span-full text-center mb-4">
                         <button
                           onClick={() => {
                             const element = document.getElementById('more-streams-section');
@@ -923,7 +872,7 @@ const Dashboard = () => {
                               element.scrollIntoView({ behavior: 'smooth' });
                             }
                           }}
-                          className="p-2 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-all duration-300 ease-in-out transform hover:scale-110 active:scale-95"
+                          className="p-2 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-colors"
                           title="Scroll to More Streams"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -936,19 +885,11 @@ const Dashboard = () => {
                     {/* Render remaining streams if there are more than 5 */}
                     {topicStreams.length > 5 && (
                       <>
-                        <div id="more-streams-section" className="col-span-full border-t border-border py-4 mb-4 transition-opacity duration-300 ease-in-out" style={{ opacity: isTransitioning ? 0 : 1, transitionDelay: '450ms' }}>
+                        <div id="more-streams-section" className="col-span-full border-t border-border py-4 mb-4">
                           <h3 className="text-md font-medium text-foreground">More Streams</h3>
                         </div>
-                        {topicStreams.slice(5).map((stream, index) => (
-                          <div 
-                            key={stream.id}
-                            className="transition-all duration-500 ease-in-out"
-                            style={{ 
-                              opacity: isTransitioning ? 0 : 1,
-                              transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)',
-                              transitionDelay: `${Math.min(450 + (index * 70), 800)}ms`
-                            }}
-                          >
+                        {topicStreams.slice(5).map(stream => (
+                          <div key={stream.id}>
                             <TopicStreamWidget
                               key={stream.id}
                               stream={stream}
@@ -962,7 +903,7 @@ const Dashboard = () => {
                     )}
                     
                     {topicStreams.length === 0 && !loading && (
-                      <div className="col-span-full rounded-lg shadow-sm p-6 text-center bg-card border border-border transition-all duration-300 ease-in-out transform">
+                      <div className="col-span-full rounded-lg shadow-sm p-6 text-center bg-card border border-border">
                         <p className="text-muted-foreground">
                           No topic streams available to display in grid view.
                         </p>
@@ -970,19 +911,14 @@ const Dashboard = () => {
                     )}
                   </div>
                 ) : viewMode === 'list' && selectedStream ? (
-                  <div className="transition-all duration-300 ease-in-out" style={{ 
-                    opacity: isTransitioning ? 0 : 1,
-                    transform: isTransitioning ? 'translateY(10px)' : 'translateY(0)'
-                  }}>
-                    <TopicStreamWidget 
-                      stream={selectedStream} 
-                      onDelete={() => handleDeleteStream(selectedStream.id)} 
-                      onUpdate={handleUpdateStream}
-                      isGridView={false} 
-                    />
-                  </div>
+                  <TopicStreamWidget 
+                    stream={selectedStream} 
+                    onDelete={() => handleDeleteStream(selectedStream.id)} 
+                    onUpdate={handleUpdateStream}
+                    isGridView={false} 
+                  />
                 ) : viewMode === 'list' ? (
-                  <div className="rounded-lg shadow-sm p-6 text-center bg-card border border-border transition-all duration-300 ease-in-out">
+                  <div className="rounded-lg shadow-sm p-6 text-center bg-card border border-border">
                     <p className="text-muted-foreground">
                       Select a topic stream or create a new one to get started
                     </p>
@@ -996,16 +932,16 @@ const Dashboard = () => {
 
       {/* Loading overlay for delete operation */}
       {isDeleting && (
-        <div className="fixed inset-0 bg-background/75 flex items-center justify-center z-50 transition-opacity duration-300 ease-in-out" data-testid="deleting-overlay">
-          <div className="bg-card rounded-lg p-4 shadow-xl transition-all duration-300 ease-in-out transform">
+        <div className="fixed inset-0 bg-background/75 flex items-center justify-center z-50" data-testid="deleting-overlay">
+          <div className="bg-card rounded-lg p-4 shadow-xl">
             <p className="text-foreground">Deleting topic stream...</p>
           </div>
         </div>
       )}
 
       {showDeepDive && selectedSummary && (
-        <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center transition-opacity duration-300 ease-in-out">
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col transition-all duration-300 ease-in-out transform" style={{ maxWidth: '1400px' }}>
+        <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center">
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col" style={{ maxWidth: '1400px' }}>
             <div className="p-4 border-b border-border flex justify-between items-center">
               {/* Truncated Stream Title */}
               <div className="flex-1 overflow-hidden min-w-0 mr-4">
@@ -1015,7 +951,7 @@ const Dashboard = () => {
               </div>
               <button
                 onClick={() => setShowDeepDive(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors duration-300 transform hover:rotate-90"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
