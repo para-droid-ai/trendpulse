@@ -136,10 +136,10 @@ class PerplexityAPI:
     async def _make_request(self, endpoint: str, payload: Dict[str, Any], timeout_seconds: int = 60) -> Dict[str, Any]:
         url = f"{self.BASE_URL}/{endpoint}"
         try:
-            # Create a timeout context
-            timeout = aiohttp.ClientTimeout(total=timeout_seconds)
-            # Using verify_ssl=False to work around macOS certificate issues
-            async with aiohttp.ClientSession(timeout=timeout, connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
+            # Use dynamic timeout
+            timeout_config = aiohttp.ClientTimeout(total=timeout_seconds)
+            
+            async with aiohttp.ClientSession(timeout=timeout_config) as session:
                 logger.debug(f"Making API request to {url} with timeout of {timeout_seconds} seconds")
                 
                 async with session.post(url, headers=self.headers, json=payload) as response:
