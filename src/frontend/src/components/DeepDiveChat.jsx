@@ -183,7 +183,7 @@ const DeepDiveChat = ({ topicStreamId, summaryId, topic, onAppend }) => {
                   <div className="text-sm">
                     {/* Summary Content with Read More */}
                     <div className={`dark:prose-invert overflow-hidden ${!message.isExpanded ? 'line-clamp-10' : ''}`}>
-                      <MarkdownRenderer content={message.content} />
+                      <MarkdownRenderer content={message.content} sources={message.sources} />
                     </div>
                     {message.content && message.content.length > 500 && (
                       <button

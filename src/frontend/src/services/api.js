@@ -14,8 +14,12 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+    console.log(`🔐 Request interceptor: Token present: ${!!token}`);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log(`🔑 Request interceptor: Added auth header for ${config.method?.toUpperCase()} ${config.url}`);
+    } else {
+      console.warn(`⚠️ Request interceptor: No token found for ${config.method?.toUpperCase()} ${config.url}`);
     }
     return config;
   },
@@ -149,10 +153,16 @@ export const topicStreamAPI = {
   
   delete: async (id) => {
     try {
+      console.log(`🚀 API: Starting delete request for stream ID: ${id}`);
       const response = await api.delete(`/topic-streams/${id}`);
+      console.log(`✅ API: Delete successful for ID ${id}`, response);
       return response.data;
     } catch (error) {
-      console.error(`Delete stream error for ID ${id}:`, error);
+      console.error(`❌ API: Delete stream error for ID ${id}:`, error);
+      if (error.response) {
+        console.error('📋 API: Server response:', error.response.data);
+        console.error('📊 API: Status code:', error.response.status);
+      }
       throw error;
     }
   },

@@ -4,9 +4,12 @@ from dotenv import load_dotenv
 import requests
 import aiohttp
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import time
 import json
+import ssl
+import certifi
+from utils.tokenizer_utils import count_tokens
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -114,7 +117,8 @@ class PerplexityAPI:
     def _make_request_sync(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.BASE_URL}/{endpoint}"
         try:
-            response = requests.post(url, headers=self.headers, json=payload)
+            # Use certifi for SSL certificate verification
+            response = requests.post(url, headers=self.headers, json=payload, verify=certifi.where())
             response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -136,10 +140,16 @@ class PerplexityAPI:
     async def _make_request(self, endpoint: str, payload: Dict[str, Any], timeout_seconds: int = 60) -> Dict[str, Any]:
         url = f"{self.BASE_URL}/{endpoint}"
         try:
+            # Create SSL context with proper certificates
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            
             # Use dynamic timeout
             timeout_config = aiohttp.ClientTimeout(total=timeout_seconds)
             
-            async with aiohttp.ClientSession(timeout=timeout_config) as session:
+            # Create connector with SSL context
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
+            async with aiohttp.ClientSession(timeout=timeout_config, connector=connector) as session:
                 logger.debug(f"Making API request to {url} with timeout of {timeout_seconds} seconds")
                 
                 async with session.post(url, headers=self.headers, json=payload) as response:
