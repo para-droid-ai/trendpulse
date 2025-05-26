@@ -2,28 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 @import './markdown.css';
-@import 'tw-animate-css';
 
+/* CSS Custom Properties for Theming */
 :root {
-  --background: oklch(0.92 0.00 48.72);
-  --foreground: oklch(0.28 0.04 260.03);
-  --card: oklch(0.97 0.00 106.42);
-  --card-foreground: oklch(0.28 0.04 260.03);
-  --popover: oklch(0.97 0.00 106.42);
-  --popover-foreground: oklch(0.28 0.04 260.03);
-  --primary: oklch(0.59 0.20 277.12);
-  --primary-foreground: oklch(1.00 0 0);
-  --secondary: oklch(0.87 0.00 56.37);
-  --secondary-foreground: oklch(0.45 0.03 256.80);
-  --muted: oklch(0.92 0.00 48.72);
-  --muted-foreground: oklch(0.55 0.02 264.36);
-  --accent: oklch(0.94 0.03 321.94);
-  --accent-foreground: oklch(0.37 0.03 259.73);
-  --destructive: oklch(0.64 0.21 25.33);
-  --destructive-foreground: oklch(1.00 0 0);
-  --border: oklch(0.87 0.00 56.37);
-  --input: oklch(0.87 0.00 56.37);
-  --ring: oklch(0.59 0.20 277.12);
+  /* Default theme values - will be overridden by theme system */
+  --primary: hsl(0 0% 98%);
+  --primary-foreground: hsl(240 5.9% 10%);
+  --secondary: hsl(240 3.7% 15.9%);
+  --secondary-foreground: hsl(0 0% 98%);
+  --accent: hsl(240 3.7% 15.9%);
+  --accent-foreground: hsl(0 0% 98%);
+  --background: hsl(240 10% 3.9%);
+  --foreground: hsl(0 0% 98%);
+  --card: hsl(240 10% 3.9%);
+  --card-foreground: hsl(0 0% 98%);
+  --popover: hsl(240 10% 3.9%);
+  --popover-foreground: hsl(0 0% 98%);
+  --muted: hsl(240 3.7% 15.9%);
+  --muted-foreground: hsl(240 5% 64.9%);
+  --destructive: hsl(0 62.8% 30.6%);
+  --destructive-foreground: hsl(0 0% 98%);
+  --border: hsl(240 3.7% 15.9%);
+  --input: hsl(240 3.7% 15.9%);
+  --ring: hsl(240 4.9% 83.9%);
   --thoughts-mask-background-dark: oklch(0.35 0.01 60);
   --chart-1: oklch(0.68 0.16 276.93);
   --chart-2: oklch(0.59 0.20 277.12);
@@ -100,6 +101,118 @@
   --shadow-2xl: 2px 2px 10px 4px hsl(0 0% 0% / 0.45);
 }
 
+/* Line clamp utilities */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* Force prose content to use theme colors instead of Tailwind typography defaults */
+.prose {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-lead: var(--muted-foreground);
+  --tw-prose-links: var(--primary);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-counters: var(--muted-foreground);
+  --tw-prose-bullets: var(--muted-foreground);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--foreground);
+  --tw-prose-quote-borders: var(--border);
+  --tw-prose-captions: var(--muted-foreground);
+  --tw-prose-code: var(--foreground);
+  --tw-prose-pre-code: var(--foreground);
+  --tw-prose-pre-bg: var(--muted);
+  --tw-prose-th-borders: var(--border);
+  --tw-prose-td-borders: var(--border);
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: var(--foreground) !important;
+}
+
+.prose p,
+.prose span,
+.prose div,
+.prose li,
+.prose td,
+.prose th {
+  color: var(--foreground) !important;
+}
+
+.prose a {
+  color: var(--primary) !important;
+}
+
+.prose code {
+  color: var(--foreground) !important;
+  background-color: var(--muted) !important;
+}
+
+.prose blockquote {
+  color: var(--foreground) !important;
+  border-left-color: var(--border) !important;
+}
+
+.prose strong {
+  color: var(--foreground) !important;
+}
+
+/* Hover effects */
+.hover-lift {
+  transition: all 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.hover-lift:active {
+  transform: translateY(0);
+}
+
+/* View mode slider animation */
+.view-mode-slider-indicator {
+  transition: left 0.3s ease;
+}
+
+.view-mode-button {
+  transition: all 0.2s ease;
+}
+
+/* Apple-style focus states */
+button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -164,6 +277,298 @@
     margin: 0;
     @apply font-sans;
   }
+  
+  /* Prevent scrollbar jiggle - Apple-style stable layout */
+  html {
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
+  }
+  
+  /* Ensure consistent scrollbar behavior across all containers */
+  .min-h-screen {
+    scrollbar-gutter: stable;
+  }
+  
+  /* Apple-quality view transition system */
+  .streams-view, .mobile-feed-view {
+    transform: translate3d(0, 0, 0); /* Hardware acceleration */
+    will-change: transform, opacity;
+    min-height: 400px; /* Prevent layout shift */
+  }
+  
+  /* Prevent layout shift during content transitions */
+  .max-w-7xl {
+    contain: layout style;
+  }
+  
+  /* Enhanced view mode transitions with Apple easing */
+  .mobile-feed-view {
+    animation: mobileViewEnter 400ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+  
+  .streams-view {
+    animation: streamsViewEnter 400ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+  
+  /* Staggered grid animations */
+  .streams-view .grid {
+    animation: gridContainerEnter 500ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+  
+  /* Individual grid items with stagger */
+  .streams-view .grid > * {
+    animation: gridItemEnter 600ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    opacity: 0;
+    transform: translate3d(0, 20px, 0) scale(0.95);
+  }
+  
+  .streams-view .grid > *:nth-child(1) { animation-delay: 0ms; }
+  .streams-view .grid > *:nth-child(2) { animation-delay: 80ms; }
+  .streams-view .grid > *:nth-child(3) { animation-delay: 160ms; }
+  .streams-view .grid > *:nth-child(4) { animation-delay: 120ms; }
+  .streams-view .grid > *:nth-child(5) { animation-delay: 200ms; }
+  .streams-view .grid > *:nth-child(6) { animation-delay: 280ms; }
+  .streams-view .grid > *:nth-child(7) { animation-delay: 240ms; }
+  .streams-view .grid > *:nth-child(8) { animation-delay: 320ms; }
+  .streams-view .grid > *:nth-child(9) { animation-delay: 400ms; }
+  
+  /* List view items with smoother stagger */
+  .streams-view .space-y-6 > * {
+    animation: listItemEnter 500ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    opacity: 0;
+    transform: translate3d(-30px, 0, 0);
+  }
+  
+  .streams-view .space-y-6 > *:nth-child(1) { animation-delay: 0ms; }
+  .streams-view .space-y-6 > *:nth-child(2) { animation-delay: 100ms; }
+  .streams-view .space-y-6 > *:nth-child(3) { animation-delay: 200ms; }
+  .streams-view .space-y-6 > *:nth-child(4) { animation-delay: 300ms; }
+  .streams-view .space-y-6 > *:nth-child(5) { animation-delay: 400ms; }
+  .streams-view .space-y-6 > *:nth-child(6) { animation-delay: 500ms; }
+  
+  /* Feed view items with elegant cascade */
+  .mobile-feed-view > div > * {
+    animation: feedItemEnter 500ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    opacity: 0;
+    transform: translate3d(0, 30px, 0) scale(0.98);
+  }
+  
+  .mobile-feed-view > div > *:nth-child(1) { animation-delay: 0ms; }
+  .mobile-feed-view > div > *:nth-child(2) { animation-delay: 120ms; }
+  .mobile-feed-view > div > *:nth-child(3) { animation-delay: 240ms; }
+  .mobile-feed-view > div > *:nth-child(4) { animation-delay: 360ms; }
+  .mobile-feed-view > div > *:nth-child(5) { animation-delay: 480ms; }
+  
+  /* Apple-quality keyframe animations */
+  @keyframes mobileViewEnter {
+    0% {
+      opacity: 0;
+      transform: translate3d(40px, 0, 0) scale(0.96);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+  
+  @keyframes streamsViewEnter {
+    0% {
+      opacity: 0;
+      transform: translate3d(-40px, 0, 0) scale(0.96);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+  
+  @keyframes gridContainerEnter {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 20px, 0);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  
+  @keyframes gridItemEnter {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 20px, 0) scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+  
+  @keyframes listItemEnter {
+    0% {
+      opacity: 0;
+      transform: translate3d(-30px, 0, 0);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  
+  @keyframes feedItemEnter {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 30px, 0) scale(0.98);
+    }
+    100% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+  
+  /* Apple-style new stream highlight */
+  @keyframes newStreamPulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
+      border-color: rgba(79, 70, 229, 0.6);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.1);
+      border-color: rgba(79, 70, 229, 0.8);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+      border-color: rgba(79, 70, 229, 0.3);
+    }
+  }
+  
+  .new-stream-highlight {
+    animation: newStreamPulse 2s ease-in-out;
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 4px 12px hsl(var(--primary) / 0.15);
+  }
+  
+  /* Selected stream highlight */
+  .selected-stream {
+    border-color: hsl(var(--primary));
+    background: linear-gradient(to right, 
+      hsl(var(--primary) / 0.03) 0%, 
+      hsl(var(--card)) 8%, 
+      hsl(var(--card)) 92%, 
+      hsl(var(--primary) / 0.03) 100%
+    );
+    box-shadow: 
+      0 0 0 1px hsl(var(--primary) / 0.2),
+      0 4px 12px hsl(var(--primary) / 0.1),
+      inset 0 1px 0 hsl(var(--primary) / 0.1);
+    transform: translateY(-1px);
+  }
+  
+  /* Enhanced view mode slider animations */
+  .view-mode-slider {
+    transition: all 350ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  
+  .view-mode-slider-indicator {
+    transition: all 350ms cubic-bezier(0.25, 0.1, 0.25, 1);
+    will-change: transform, left, width;
+  }
+  
+  /* Smooth button hover states */
+  .view-mode-button {
+    transition: all 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+    transform: translate3d(0, 0, 0);
+  }
+  
+  .view-mode-button:hover {
+    transform: translateY(-1px);
+  }
+  
+  .view-mode-button:active {
+    transform: translateY(0);
+    transition-duration: 100ms;
+  }
+  
+  /* Ensure all interactive elements have smooth transitions */
+  button, a, [role="button"] {
+    transition: all 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+    transform: translate3d(0, 0, 0);
+  }
+  
+  /* Orbital Loading Animation Enhancements */
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
+  }
+
+  /* Additional orbital animation keyframes */
+  @keyframes orbitSlow {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes orbitFast {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes planetGlow {
+    0%, 100% {
+      box-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor;
+    }
+    50% {
+      box-shadow: 0 0 8px currentColor, 0 0 16px currentColor, 0 0 24px currentColor;
+    }
+  }
+
+  @keyframes starPulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+  }
+
+  /* Apply animations to orbital elements */
+  .animate-orbit-slow {
+    animation: orbitSlow 8s linear infinite;
+  }
+
+  .animate-orbit-fast {
+    animation: orbitFast 4s linear infinite;
+  }
+
+  .animate-planet-glow {
+    animation: planetGlow 3s ease-in-out infinite;
+  }
+
+  .animate-star-pulse {
+    animation: starPulse 2s ease-in-out infinite;
+  }
+
+  /* Stream loading overlay specific styles */
+  .stream-loading-overlay {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .constellation-star {
+    background: radial-gradient(circle, 
+      rgba(255, 255, 255, 0.8) 0%, 
+      rgba(255, 255, 255, 0.4) 50%, 
+      transparent 100%);
+  }
+
   code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
       monospace;
@@ -173,5 +578,191 @@
 @layer utilities {
   .dark-thoughts-mask-bg {
     @apply dark:bg-[var(--thoughts-mask-background-dark)];
+  }
+
+  /* Update Tailwind color classes to use CSS custom properties */
+  .bg-background { background-color: var(--background); }
+  .bg-foreground { background-color: var(--foreground); }
+  .bg-card { background-color: var(--card); }
+  .bg-card-foreground { background-color: var(--card-foreground); }
+  .bg-popover { background-color: var(--popover); }
+  .bg-popover-foreground { background-color: var(--popover-foreground); }
+  .bg-primary { background-color: var(--primary); }
+  .bg-primary-foreground { background-color: var(--primary-foreground); }
+  .bg-secondary { background-color: var(--secondary); }
+  .bg-secondary-foreground { background-color: var(--secondary-foreground); }
+  .bg-accent { background-color: var(--accent); }
+  .bg-accent-foreground { background-color: var(--accent-foreground); }
+  .bg-muted { background-color: var(--muted); }
+  .bg-muted-foreground { background-color: var(--muted-foreground); }
+  .bg-destructive { background-color: var(--destructive); }
+  .bg-destructive-foreground { background-color: var(--destructive-foreground); }
+  .bg-border { background-color: var(--border); }
+  .bg-input { background-color: var(--input); }
+  .bg-ring { background-color: var(--ring); }
+
+  .text-background { color: var(--background); }
+  .text-foreground { color: var(--foreground); }
+  .text-card { color: var(--card); }
+  .text-card-foreground { color: var(--card-foreground); }
+  .text-popover { color: var(--popover); }
+  .text-popover-foreground { color: var(--popover-foreground); }
+  .text-primary { color: var(--primary); }
+  .text-primary-foreground { color: var(--primary-foreground); }
+  .text-secondary { color: var(--secondary); }
+  .text-secondary-foreground { color: var(--secondary-foreground); }
+  .text-accent { color: var(--accent); }
+  .text-accent-foreground { color: var(--accent-foreground); }
+  .text-muted { color: var(--muted); }
+  .text-muted-foreground { color: var(--muted-foreground); }
+  .text-destructive { color: var(--destructive); }
+  .text-destructive-foreground { color: var(--destructive-foreground); }
+  .text-border { color: var(--border); }
+  .text-input { color: var(--input); }
+  .text-ring { color: var(--ring); }
+
+  .border-background { border-color: var(--background); }
+  .border-foreground { border-color: var(--foreground); }
+  .border-card { border-color: var(--card); }
+  .border-card-foreground { border-color: var(--card-foreground); }
+  .border-popover { border-color: var(--popover); }
+  .border-popover-foreground { border-color: var(--popover-foreground); }
+  .border-primary { border-color: var(--primary); }
+  .border-primary-foreground { border-color: var(--primary-foreground); }
+  .border-secondary { border-color: var(--secondary); }
+  .border-secondary-foreground { border-color: var(--secondary-foreground); }
+  .border-accent { border-color: var(--accent); }
+  .border-accent-foreground { border-color: var(--accent-foreground); }
+  .border-muted { border-color: var(--muted); }
+  .border-muted-foreground { border-color: var(--muted-foreground); }
+  .border-destructive { border-color: var(--destructive); }
+  .border-destructive-foreground { border-color: var(--destructive-foreground); }
+  .border-border { border-color: var(--border); }
+  .border-input { border-color: var(--input); }
+  .border-ring { border-color: var(--ring); }
+
+  .ring-background { --tw-ring-color: var(--background); }
+  .ring-foreground { --tw-ring-color: var(--foreground); }
+  .ring-card { --tw-ring-color: var(--card); }
+  .ring-card-foreground { --tw-ring-color: var(--card-foreground); }
+  .ring-popover { --tw-ring-color: var(--popover); }
+  .ring-popover-foreground { --tw-ring-color: var(--popover-foreground); }
+  .ring-primary { --tw-ring-color: var(--primary); }
+  .ring-primary-foreground { --tw-ring-color: var(--primary-foreground); }
+  .ring-secondary { --tw-ring-color: var(--secondary); }
+  .ring-secondary-foreground { --tw-ring-color: var(--secondary-foreground); }
+  .ring-accent { --tw-ring-color: var(--accent); }
+  .ring-accent-foreground { --tw-ring-color: var(--accent-foreground); }
+  .ring-muted { --tw-ring-color: var(--muted); }
+  .ring-muted-foreground { --tw-ring-color: var(--muted-foreground); }
+  .ring-destructive { --tw-ring-color: var(--destructive); }
+  .ring-destructive-foreground { --tw-ring-color: var(--destructive-foreground); }
+  .ring-border { --tw-ring-color: var(--border); }
+  .ring-input { --tw-ring-color: var(--input); }
+  .ring-ring { --tw-ring-color: var(--ring); }
+
+  /* Opacity variants for primary color */
+  .bg-primary\/10 { background-color: color-mix(in srgb, var(--primary) 10%, transparent); }
+  .bg-primary\/20 { background-color: color-mix(in srgb, var(--primary) 20%, transparent); }
+  .bg-primary\/50 { background-color: color-mix(in srgb, var(--primary) 50%, transparent); }
+  .bg-primary\/75 { background-color: color-mix(in srgb, var(--primary) 75%, transparent); }
+  
+  .bg-accent\/10 { background-color: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .bg-accent\/20 { background-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+  .bg-accent\/50 { background-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+  .bg-accent\/75 { background-color: color-mix(in srgb, var(--accent) 75%, transparent); }
+
+  .bg-destructive\/10 { background-color: color-mix(in srgb, var(--destructive) 10%, transparent); }
+  .bg-destructive\/20 { background-color: color-mix(in srgb, var(--destructive) 20%, transparent); }
+  .bg-destructive\/50 { background-color: color-mix(in srgb, var(--destructive) 50%, transparent); }
+  .bg-destructive\/75 { background-color: color-mix(in srgb, var(--destructive) 75%, transparent); }
+
+  .bg-muted\/30 { background-color: color-mix(in srgb, var(--muted) 30%, transparent); }
+  .bg-muted\/50 { background-color: color-mix(in srgb, var(--muted) 50%, transparent); }
+
+  .hover\:bg-accent\/50:hover { background-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+  .hover\:bg-primary\/90:hover { background-color: color-mix(in srgb, var(--primary) 90%, transparent); }
+  .hover\:bg-destructive\/90:hover { background-color: color-mix(in srgb, var(--destructive) 90%, transparent); }
+
+  .ring-primary\/20 { --tw-ring-color: color-mix(in srgb, var(--primary) 20%, transparent); }
+}
+
+/* Universal Modal and Popup Positioning System - Dead Center Viewport */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  min-width: 100vw !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 9999 !important;
+  padding: 1rem;
+  overflow: hidden; /* Prevent any scrolling */
+}
+
+.modal-content {
+  position: relative;
+  max-height: 90vh;
+  max-width: 90vw;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bulletproof viewport centering for ALL modals */
+.viewport-center-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem;
+  /* Prevent scrolling interference */
+  overflow: hidden;
+}
+
+/* Content within viewport-centered modals */
+.viewport-center-content {
+  position: relative;
+  max-height: 90vh;
+  max-width: 90vw;
+  overflow-y: auto;
+  /* Ensure content doesn't interfere with centering */
+  margin: 0;
+}
+
+/* Ensure all popups stay fixed to viewport regardless of page scroll */
+.fixed-viewport-popup {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 9999 !important;
+  /* Prevent any offset from page scroll */
+  margin: 0 !important;
+}
+
+/* Responsive adjustments for small screens */
+@media (max-height: 600px) {
+  .modal-content, .viewport-center-content {
+    max-height: 95vh;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-overlay, .viewport-center-modal {
+    padding: 0.5rem;
+  }
+  
+  .modal-content, .viewport-center-content {
+    max-width: 95vw;
   }
 }

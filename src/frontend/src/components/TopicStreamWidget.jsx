@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { topicStreamAPI } from '../services/api';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
-import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import DeepDiveChat from './DeepDiveChat';
 import MarkdownRenderer from './MarkdownRenderer';
 import SummaryDeleteButton from './SummaryDeleteButton';
 import TopicStreamForm from './TopicStreamForm';
-import { useTheme } from '../context/ThemeContext';
+import Portal from './Portal';
+import OrbitalLoadingAnimation from './OrbitalLoadingAnimation';
 
 // Custom locale for abbreviated distance
 const customDistanceLocale = {
@@ -58,11 +58,23 @@ const localeWithAbbreviation = {
     options: {},
 };
 
-const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
+const TopicStreamWidget = ({ 
+  stream, 
+  onDelete, 
+  onUpdate, 
+  isGridView, 
+  onDragStart, 
+  onDragEnd, 
+  onDragOver, 
+  onDrop, 
+  isDraggedOver, 
+  isDragging,
+  isNewlyCreated = false,
+  isSelected = false
+}) => {
   const [summaries, setSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [expandedSummaryId, setExpandedSummaryId] = useState(null);
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [selectedSummary, setSelectedSummary] = useState(null);
@@ -73,21 +85,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   // State for deleting the WHOLE stream (keep existing)
   const [showDeleteStreamConfirm, setShowDeleteStreamConfirm] = useState(false);
 
-  // State for token count
-  const [totalStoredEstTokens, setTotalStoredEstTokens] = useState(stream.total_stored_est_tokens || 0);
-
-  const theme = useTheme();
-
-  useEffect(() => {
-    fetchSummaries();
-  }, [stream.id]);
-
-  // Update total stored tokens when the stream prop changes (e.g., after update)
-  useEffect(() => {
-    setTotalStoredEstTokens(stream.total_stored_est_tokens || 0);
-  }, [stream.total_stored_est_tokens]);
-
-  const fetchSummaries = async () => {
+  const fetchSummaries = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -105,7 +103,11 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [stream.id, stream.model_type]);
+
+  useEffect(() => {
+    fetchSummaries();
+  }, [fetchSummaries]);
 
   const handleUpdateNow = async () => {
     try {
@@ -117,7 +119,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
       if (newSummary.content && newSummary.content.includes("No new information is available")) {
         setError('No new information is available since the last update.');
       } else {
-        setSummaries([newSummary, ...summaries]);
+        setSummaries(prevSummaries => [newSummary, ...prevSummaries]);
       }
     } catch (err) {
       console.error('Failed to update stream:', err);
@@ -128,11 +130,16 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   };
 
   const handleDeleteStream = () => {
+    console.log('🗑️ Delete stream button clicked for stream:', stream.id);
     setShowDeleteStreamConfirm(true);
   };
 
   const confirmDeleteStream = () => {
+    console.log('✅ Delete stream confirmed for stream:', stream.id);
+    console.log('🔄 Calling onDelete prop with stream ID:', stream.id);
+    if (onDelete && typeof onDelete === 'function') {
     onDelete(stream.id);
+    }
     setShowDeleteStreamConfirm(false);
   };
 
@@ -141,7 +148,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   };
 
   const handleSummarySuccessfullyDeleted = (deletedSummaryId) => {
-    setSummaries(prevSummaries => prevSummaries.filter(s => s.id !== deletedSummaryId));
+    console.log('📝 Summary successfully deleted:', deletedSummaryId);
+    setSummaries(prevSummaries => {
+      const newSummaries = prevSummaries.filter(s => s.id !== deletedSummaryId);
+      console.log('📊 Updated summaries count:', newSummaries.length);
+      return newSummaries;
+    });
     setError('');
   };
 
@@ -150,20 +162,12 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
   };
 
   const handleAppendSummary = (newSummary) => {
-    setSummaries([newSummary, ...summaries]);
+    setSummaries(prevSummaries => [newSummary, ...prevSummaries]);
   };
 
   const handleDeepDive = (summary) => {
     setSelectedSummary(summary);
     setShowDeepDive(true);
-  };
-
-  const toggleExpandSummary = (id) => {
-    if (expandedSummaryId === id) {
-      setExpandedSummaryId(null);
-    } else {
-      setExpandedSummaryId(id);
-    }
   };
 
   const handleEdit = () => {
@@ -191,15 +195,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
       content += `*Detail Level:* ${streamData.detail_level}\n`;
       if (streamData.last_updated) {
         // Re-use the date formatting logic for consistency
-        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const lastUpdatedFormatted = formatInTimeZone(toZonedTime(parseISO(streamData.last_updated + 'Z'), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a');
+        const lastUpdatedFormatted = format(parseISO(streamData.last_updated), 'MMM d, yyyy h:mm a');
         content += `*Last Updated:* ${lastUpdatedFormatted}\n`;
       }
       content += `\n---\n\n`;
 
       summariesData.forEach((summary, index) => {
-        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const createdAtFormatted = summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : '';
+        const createdAtFormatted = summary.created_at ? format(parseISO(summary.created_at), 'MMM d, yyyy h:mm a') : '';
 
         content += `## Summary ${summariesData.length - index}\n\n`;
         content += `*Generated:* ${createdAtFormatted}\n`;
@@ -228,15 +230,13 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
       content += `Update Frequency: ${streamData.update_frequency}\n`;
       content += `Detail Level: ${streamData.detail_level}\n`;
         if (streamData.last_updated) {
-        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const lastUpdatedFormatted = formatInTimeZone(toZonedTime(parseISO(streamData.last_updated + 'Z'), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a');
+        const lastUpdatedFormatted = format(parseISO(streamData.last_updated), 'MMM d, yyyy h:mm a');
         content += `Last Updated: ${lastUpdatedFormatted}\n`;
       }
       content += `\n---\n\n`;
 
       summariesData.forEach((summary, index) => {
-        const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const createdAtFormatted = summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : '';
+        const createdAtFormatted = summary.created_at ? format(parseISO(summary.created_at), 'MMM d, yyyy h:mm a') : '';
 
         content += `Summary ${summariesData.length - index}\n\n`;
         content += `Generated: ${createdAtFormatted}\n`;
@@ -326,29 +326,39 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
     }
   };
 
-  if (!stream) {
+  if (!stream || !stream.id) {
+    console.warn('TopicStreamWidget: Invalid stream prop received', stream);
     return null;
   }
 
   console.log(`TopicStreamWidget mounted/rendered for stream ID ${stream.id}. Total Stored Est Tokens from prop: ${stream.total_stored_est_tokens}`);
 
-  // Calculate time since last update
-  const lastUpdateTimestamp = summaries.length > 0 ? summaries[0].created_at : null;
-
-  // Get user's local time zone
-  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  console.log('User Time Zone:', userTimeZone);
+  // Calculate time since last update with safety check
+  const lastUpdateTimestamp = summaries && summaries.length > 0 ? summaries[0].created_at : null;
 
   const timeSinceLastUpdate = lastUpdateTimestamp
-    ? formatDistanceToNowStrict(toZonedTime(parseISO(lastUpdateTimestamp + 'Z'), userTimeZone), { addSuffix: true, locale: localeWithAbbreviation })
+    ? formatDistanceToNowStrict(parseISO(lastUpdateTimestamp), { addSuffix: true, locale: localeWithAbbreviation })
     : 'Never updated';
 
   return (
-    <div className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-card border border-border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200`}>
+    <div 
+      className={`${isGridView ? 'lg:col-span-1' : 'w-full'} bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-lg hover:border-border/50 transition-all duration-300 ease-out group ${
+        isDraggedOver ? 'border-primary bg-primary/5' : ''
+      } ${isDragging ? 'opacity-50' : ''} ${isNewlyCreated ? 'new-stream-highlight' : ''} ${isSelected ? 'selected-stream' : ''}`}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       {showEditForm ? (
-        <div className="p-4 bg-card">
-          <h3 className="text-lg font-medium text-foreground mb-4">Edit Topic Stream</h3>
-          <div className="text-xs text-muted-foreground mb-4">Stream ID: {stream.id}</div>
+        <div className="p-6 bg-card animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-foreground">Edit Topic Stream</h3>
+            <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+              ID: {stream.id}
+            </div>
+          </div>
           <TopicStreamForm
             initialData={stream}
             onSubmit={handleEditSubmit}
@@ -358,198 +368,180 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
         </div>
       ) : (
         <>
-          <div className="p-4 border-b border-border flex flex-col">
-            <div className="flex justify-between items-start">
-              <div className={`${isGridView ? 'w-full' : 'flex-1 min-w-0 mr-4'}`}>
-                <h3 className={`text-lg font-semibold text-foreground ${isGridView ? 'line-clamp-3' : 'truncate'}`}>
+          {/* Header */}
+          <div className="p-6 pb-4 border-b border-border/50">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-foreground leading-tight mb-2 group-hover:text-primary transition-colors">
                    {stream.query}
                  </h3>
-                 {/* Tags and timestamp - Render based on isGridView */}
-                 <div className="flex flex-wrap gap-2 mt-2"> {/* Consistent tag layout */}
-                   {stream.update_frequency && (
-                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
-                       {stream.update_frequency}
-                     </span>
-                   )}
-                   {/* Detail Level Badge */}
-                   {stream.detail_level && (
-                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#25b6a5] dark:text-black">
-                       {stream.detail_level}
-                     </span>
-                   )}
-                   {/* Model Badge */}
-                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#6495ed] flex-shrink-0 dark:text-black">{/* flex-shrink-0 */}
-                     {stream.model_type}
-                   </span>
-                   {/* Time Since Last Update - Keep with other badges */}
-                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#818cf8] dark:text-black">
-                     {timeSinceLastUpdate}
-                   </span>
-                   {/* --- CONSOLIDATED AUTO-UPDATE BADGE --- */}
-                   {!stream.auto_update_enabled && (
-                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                       Auto-Updates Off
-                     </span>
-                   )}
-                   {/* --- END CONSOLIDATED BADGE --- */}
+                <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-1">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M12 1v6M12 17v6M5.64 5.64l4.24 4.24M14.12 14.12l4.24 4.24M1 12h6M17 12h6M5.64 18.36l4.24-4.24M14.12 9.88l4.24-4.24"/>
+                    </svg>
+                    <span className="capitalize">{stream.update_frequency}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14,2 14,8 20,8"/>
+                    </svg>
+                    <span className="capitalize">{stream.detail_level}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polyline points="12,6 12,12 16,14"/>
+                    </svg>
+                    <span>{timeSinceLastUpdate}</span>
+                  </div>
                  </div>
                </div>
 
-               {/* Action Buttons - Render based on isGridView */}
-               {!isGridView && (
-                 <div className="flex space-x-1 items-center relative flex-shrink-0 justify-end"> {/* Show only in non-grid view, aligned right */}
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-2">
+                {/* Update Button */}
+                <button
+                  onClick={handleUpdateNow}
+                  disabled={updating}
+                  className="p-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all duration-200"
+                  title="Update Now"
+                >
+                  {updating ? (
+                    <OrbitalLoadingAnimation size="small" variant="orbital" />
+                  ) : (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M23 4v6h-6M1 20v-6h6"/>
+                      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M22.99 14A9 9 0 0 1 18.36 18.36L14 14"/>
+                    </svg>
+                  )}
+                </button>
+
                    {/* Edit Button */}
                    <button
                      onClick={handleEdit}
-                     className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-200"
                      title="Edit Stream"
                    >
-                      {/* Pencil Icon */}
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                       </svg>
                     </button>
 
-                    {/* Update Now Button */}
-                    <button
-                      onClick={handleUpdateNow}
-                      disabled={updating}
-                      className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      title={updating ? 'Updating...' : 'Update Now'}
-                    >
-                       {/* Using SVG file from public folder */}
-                       <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
-                     </button>
-
-                     {/* Delete Button */}
-                     <button
-                       onClick={handleDeleteStream}
-                       className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                       title="Delete Stream"
-                     >
-                        {/* Using trashcan SVG file from public folder */}
-                        <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
-                      </button>
-
-                      {/* Export Button */}
+                {/* Export Menu */}
+                <div className="relative">
                       <button
                         onClick={() => setShowExportOptions(!showExportOptions)}
-                        className="py-1 px-2 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors text-xs"
-                      >
-                        Export
+                    className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-200"
+                    title="Export Options"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7,10 12,15 17,10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
                       </button>
 
-                      {/* Export Options Dropdown */}
                       {showExportOptions && (
-                        <div className="absolute right-0 top-full mt-1 w-48 bg-popover rounded-md shadow-lg z-10"> {/* Position relative to button */}
-                          <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-20 animate-in slide-in-from-top-2 duration-200">
+                      <div className="p-2">
                             <button
-                              onClick={() => { copyToClipboard(); setShowExportOptions(false); }}
-                              className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                              role="menuitem"
-                            >
-                              Copy to Clipboard
+                          onClick={copyToClipboard}
+                          className="w-full flex items-center space-x-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                          <span>Copy to Clipboard</span>
                             </button>
                             <button
-                              onClick={() => { exportAsFile('md'); setShowExportOptions(false); }}
-                              className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                              role="menuitem"
-                            >
-                              Export as .md
+                          onClick={() => exportAsFile('md')}
+                          className="w-full flex items-center space-x-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14,2 14,8 20,8"/>
+                          </svg>
+                          <span>Export as Markdown</span>
                             </button>
                             <button
-                              onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }}
-                              className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/80"
-                              role="menuitem"
-                            >
-                              Export as .txt
+                          onClick={() => exportAsFile('txt')}
+                          className="w-full flex items-center space-x-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors"
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14,2 14,8 20,8"/>
+                          </svg>
+                          <span>Export as Text</span>
                             </button>
                           </div>
-                        </div>
-                      )}
                     </div>
-               )}
-            </div>
-
-            {/* Token count for List View - Below buttons, inside header, right aligned */}
-            {!isGridView && (totalStoredEstTokens > 0 || !loading) && (
-              <div className="flex justify-end mt-2"> {/* Container to align tag to the right */}
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
-                  Estimated Stream Tokens: {totalStoredEstTokens}
-                </span>
-              </div>
-            )}
-
-            {/* Action buttons and Token count for Grid View */}
-            {isGridView && (
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50"> {/* A new line with top border */}
-                {/* Token count for Grid View - Left aligned */}
-                <div> {/* Wrap in a div to allow for future additions here if needed */}
-                  {(totalStoredEstTokens > 0 || !loading) && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs text-black bg-[#a1c9f2] dark:text-black">
-                      Est. Stream Tokens: {totalStoredEstTokens}
-                    </span>
                   )}
                 </div>
 
-                {/* Action Buttons for Grid View - Right aligned */}
-                <div className="flex space-x-1 items-center"> {/* Container for the buttons */}
-                  {/* Edit Button */}
+                {/* Delete Stream Button - Big red X to distinguish from summary delete */}
+                <div className="relative">
                   <button
-                    onClick={handleEdit}
-                    className="p-1 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors"
-                    title="Edit Stream"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('🔴 Stream delete button clicked - Event details:', {
+                        streamId: stream?.id,
+                        hasOnDeleteProp: !!onDelete,
+                        onDeleteType: typeof onDelete,
+                        summariesCount: summaries?.length || 0,
+                        timestamp: new Date().toISOString()
+                      });
+                      handleDeleteStream();
+                    }}
+                    className="p-2 rounded-lg text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 hover:scale-110 active:scale-95 transition-all duration-200 border-2 border-red-300 dark:border-red-700 bg-red-50/50 dark:bg-red-900/10"
+                    title="🗑️ DELETE ENTIRE STREAM (All summaries will be lost!)"
+                    type="button"
+                    disabled={false}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M15 9l-6 6M9 9l6 6"/>
                     </svg>
                   </button>
-
-                  {/* Update Now Button */}
-                  <button
-                    onClick={handleUpdateNow} // Ensure this calls the correct updateNow for the specific stream
-                    disabled={updating}
-                    className={`p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title={updating ? 'Updating...' : 'Update Now'}
-                  >
-                    <img src="/icons8-refresh.svg" alt="Refresh" className={`h-4 w-4 ${updating ? 'animate-spin' : ''}`} />
-                  </button>
-
-                  {/* Delete Stream Button */}
-                  <button
-                    onClick={handleDeleteStream} // This is for deleting the whole stream
-                    className="p-1 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                    title="Delete Stream"
-                  >
-                    <img src="/icons8-trash-can.svg" alt="Delete Stream" className="h-4 w-4" />
-                  </button>
-
-                  {/* Export Button & Dropdown (simplified for brevity, ensure your existing logic is maintained) */}
-                  <div className="relative"> {/* Added relative positioning for dropdown */}
-                    <button
-                      onClick={() => setShowExportOptions(prev => !prev)} // Toggle export options
-                      className="py-1 px-2 rounded bg-muted text-foreground hover:bg-muted/80 transition-colors text-xs"
-                    >
-                      Export
-                    </button>
-                    {showExportOptions && (
-                      <div className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-md shadow-lg z-20"> {/* Adjusted z-index */}
-                        <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                          <button onClick={() => { copyToClipboard(); setShowExportOptions(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted" role="menuitem">
-                            Copy to Clipboard
-                          </button>
-                          <button onClick={() => { exportAsFile('md'); setShowExportOptions(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted" role="menuitem">
-                            Export as .md
-                          </button>
-                          <button onClick={() => { exportAsFile('txt'); setShowExportOptions(false); }} className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted" role="menuitem">
-                            Export as .txt
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
+            </div>
+
+            {/* Copy Feedback */}
+            {copyFeedback && (
+              <Portal>
+                <div 
+                  className="fixed bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+                  style={{ 
+                    position: 'fixed',
+                    top: '0',
+                    left: '0',
+                    width: '100vw',
+                    height: '100vh',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'none' // Allow clicks to pass through overlay
+                  }}
+                >
+                  <div 
+                    className="bg-foreground text-background text-sm rounded shadow-lg animate-in slide-in-from-bottom-2 duration-200"
+                    style={{
+                      position: 'relative',
+                      padding: '0.75rem 1rem',
+                      pointerEvents: 'auto' // Re-enable clicks on content
+                    }}
+                  >
+                    {copyFeedback}
+                  </div>
+                </div>
+              </Portal>
             )}
           </div>
 
@@ -576,7 +568,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                   <div className="flex flex-wrap gap-2 items-center mb-2">
                     {/* Timestamp Badge */}
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-black dark:text-white font-medium">
-                      {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
+                      {summary.created_at ? format(parseISO(summary.created_at), 'MMM d, yyyy h:mm a') : ''}
                     </span>
                     {/* Model Badge - Ensure model exists before rendering */}
                     {summary.model && (
@@ -692,8 +684,32 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
           </div>
 
           {showDeepDive && selectedSummary && (
-            <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center p-4">
-              <div className="bg-card rounded-lg shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col max-w-7xl">
+            <Portal>
+              <div 
+                className="fixed bg-background/75" 
+                style={{ 
+                  position: 'fixed',
+                  top: '0',
+                  left: '0',
+                  width: '100vw',
+                  height: '100vh',
+                  zIndex: 9999,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '1rem'
+                }}
+              >
+                <div 
+                  className="bg-card rounded-lg shadow-xl overflow-hidden flex flex-col"
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '90vh',
+                    maxWidth: '100rem',
+                    margin: '0'
+                  }}
+                >
                 <div className="p-4 border-b border-border flex justify-between items-center">
                   <h3 className="text-lg font-medium text-foreground truncate flex-1 min-w-0">
                     Deep Dive: {stream.query}
@@ -702,8 +718,16 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                     onClick={() => setShowDeepDive(false)}
                     className="text-muted-foreground hover:text-foreground"
                   >
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg 
+                        className="h-6 w-6" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      >
+                        <path d="M18 6L6 18M6 6l12 12"/>
                     </svg>
                   </button>
                 </div>
@@ -714,7 +738,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                   <div className="flex-1 basis-1/2 p-4 border-r border-border overflow-y-auto">
                     <h4 className="text-md font-medium text-foreground mb-2">Original Summary</h4>
                     <div className="text-sm text-muted-foreground mb-2">
-                      {selectedSummary.created_at ? formatInTimeZone(toZonedTime(parseISO(selectedSummary.created_at), userTimeZone), userTimeZone, 'MMM d, yyyy h:mm a') : ''} • Model: {selectedSummary.model_type}
+                        {selectedSummary.created_at ? format(parseISO(selectedSummary.created_at), 'MMM d, yyyy h:mm a') : ''} • Model: {selectedSummary.model_type}
                     </div>
                     <MarkdownRenderer content={selectedSummary.content} />
                   </div>
@@ -731,16 +755,42 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                 </div>
               </div>
             </div>
+            </Portal>
           )}
 
           {showDeleteStreamConfirm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75" onClick={cancelDeleteStream}>
-              <div className="bg-card rounded-lg p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
+            <Portal>
+              <div 
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" 
+                style={{ 
+                  position: 'fixed',
+                  top: '0',
+                  left: '0',
+                  width: '100vw',
+                  height: '100vh',
+                  zIndex: 9999,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '1rem'
+                }}
+                onClick={cancelDeleteStream}
+              >
+                <div 
+                  className="bg-card rounded-lg p-6 shadow-xl" 
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    maxWidth: '32rem',
+                    maxHeight: '90vh',
+                    margin: '0',
+                    overflow: 'auto'
+                  }}
+                  onClick={e => e.stopPropagation()}
+                >
                 <h3
                   className="text-lg font-medium text-foreground mb-4"
                   style={{
-                    width: 'calc(100% - 40px)',
-                    maxWidth: 'calc(100% - 40px)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -769,13 +819,7 @@ const TopicStreamWidget = ({ stream, onDelete, onUpdate, isGridView }) => {
                 </div>
               </div>
             </div>
-          )}
-
-          {/* Display copy feedback */}
-          {copyFeedback && (
-            <div className="absolute bottom-4 right-4 px-3 py-2 bg-foreground text-background text-sm rounded shadow-lg z-50">
-              {copyFeedback}
-            </div>
+            </Portal>
           )}
         </>
       )}

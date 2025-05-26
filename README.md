@@ -44,6 +44,31 @@ TrendPulse Dashboard is a customizable web application that empowers users to tr
 -   **Grid View:** A widget-based layout displaying topic streams as cards. Features card styling and responsive grid considerations.
 -   **Mobile Feed View:** A chronological feed of all summaries from all active streams, optimized for mobile devices.
 
+### Professional UI Design
+-   **Modern Icon System:** Professional SVG icons from [Tabler Icons](https://tabler-icons.io/) replace emoji icons throughout the interface for a clean, modern aesthetic.
+-   **Consistent Visual Language:** All interface elements use cohesive iconography including view mode toggles, action buttons, theme switching, and navigation elements.
+-   **Apple-Style Sidebar Navigation:** 
+    -   **Smooth Animations:** Collapsible sidebar with Apple's signature cubic-bezier easing curves (`cubic-bezier(0.4,0.0,0.2,1)`) for fluid open/close transitions.
+    -   **Fixed-Width Design:** Maintains content integrity during animations - no stretching or squeezing of items.
+    -   **Staggered Content Animations:** Header, stream list, and footer elements fade in with carefully timed delays for polished visual flow.
+    -   **Stream Status Indicators:** Color-coded freshness indicators (green=fresh, amber=recent, gray=stale) with hover tooltips.
+    -   **Drag-and-Drop Reordering:** Intuitive stream reordering with grab handles, visual feedback, and smooth spring animations.
+        -   **Precise Visual Insertion Indicators:** Single white pulse line shows exactly where items will be inserted during drag operations
+        -   **Accurate Positioning:** Mouse position determines insertion point (above or below hovered items) with pixel-perfect accuracy
+        -   **Real-time Feedback:** Insertion indicators update dynamically as you drag across different streams
+        -   **Complete List Support:** Drop items anywhere in the list, including at the very bottom to append to the end
+        -   **Single Line Display:** Prevents multiple insertion indicators for clean, unambiguous visual feedback
+        -   **Seamless Positioning:** Enhanced mouse tracking enables dropping between any two items, at the beginning, or at the end
+        -   **Container-Level Detection:** Advanced position calculation works in empty spaces and across the entire stream list
+        -   **Consistent Drop Behavior:** Unified drop logic ensures reliable reordering regardless of where items are dropped
+    -   **Quick Actions:** Update and delete buttons appear on hover with staggered slide-up animations.
+    -   **Smart Navigation:** Click any stream to scroll to and highlight it in the main view while keeping all streams visible.
+    -   **Keyboard Shortcuts:** Toggle sidebar with ⌘B (Command+B) for enhanced workflow efficiency.
+    -   **Stream Counter:** Footer displays total stream count with smooth number transitions.
+    -   **Responsive Design:** Slides over content on mobile, docked alongside on desktop with optimized touch targets.
+-   **Responsive Design:** Icons and UI elements scale appropriately across desktop, tablet, and mobile viewports.
+-   **Accessibility:** Proper ARIA labels and semantic markup ensure the interface is accessible to all users.
+
 ## Sonar Models Used in TrendPulse
 
 TrendPulse leverages a suite of Perplexity Sonar API models to provide diverse functionalities:

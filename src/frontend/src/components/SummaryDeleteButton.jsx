@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { topicStreamAPI } from '../services/api';
+import Portal from './Portal';
 
 const SummaryDeleteButton = ({ summaryId, streamId, onSummaryDeleted, onError, isIconOnly = false }) => {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -48,43 +49,94 @@ const SummaryDeleteButton = ({ summaryId, streamId, onSummaryDeleted, onError, i
       <button
         onClick={handleDeleteClick}
         disabled={isDeleting}
-        title={isIconOnly ? "Delete Summary" : undefined}
+        title={isIconOnly ? "🗑️ Delete This Summary Only (Stream will remain)" : undefined}
         className={`p-1 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors ${isDeleting ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         {isDeleting ? (
           isIconOnly ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v2m0 12v2m8-10h-2M4 12H2m15.364-5.364l-1.414-1.414M6.05 17.95l-1.414-1.414m11.314 0l-1.414 1.414M6.05 6.05l-1.414 1.414" />
+            <svg 
+              className="h-4 w-4 animate-spin" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+              <path d="M21 3v5h-5"/>
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+              <path d="M3 21v-5h5"/>
             </svg>
           ) : 'Deleting...'
         ) : isIconOnly ? (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          <svg 
+            className="h-6 w-6" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <path d="M3 6h18"/>
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+            <path d="M8 6V4c0-1 1-2 2-2h4c0-1 1-2 2-2v2"/>
           </svg>
         ) : 'Delete'}
       </button>
 
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/75" onClick={cancelDelete}>
-          <div className="bg-card rounded-lg p-6 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-medium text-foreground mb-4">Confirm Delete</h3>
-            <p className="text-muted-foreground mb-6">Are you sure you want to delete this summary?</p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={cancelDelete}
-                className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-md hover:bg-muted/80"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 text-sm font-medium bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-              >
-                Delete
-              </button>
+        <Portal>
+          <div 
+            className="fixed bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" 
+            style={{ 
+              position: 'fixed',
+              top: '0',
+              left: '0',
+              width: '100vw',
+              height: '100vh',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem'
+            }}
+            onClick={cancelDelete}
+          >
+            <div 
+              className="bg-card rounded-xl shadow-xl border border-border animate-in slide-in-from-top-2 duration-300" 
+              style={{
+                position: 'relative',
+                width: '100%',
+                maxWidth: '28rem',
+                maxHeight: '90vh',
+                margin: '0',
+                overflow: 'auto'
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <h3 className="text-lg font-medium text-foreground mb-4">Confirm Delete</h3>
+                <p className="text-muted-foreground mb-6">Are you sure you want to delete this summary?</p>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={cancelDelete}
+                    className="px-4 py-2 text-sm font-medium text-foreground bg-muted rounded-md hover:bg-muted/80"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    className="px-4 py-2 text-sm font-medium bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
     </>
   );

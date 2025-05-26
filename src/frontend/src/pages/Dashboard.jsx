@@ -1,64 +1,142 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import AuthContext from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { topicStreamAPI } from '../services/api';
 import TopicStreamForm from '../components/TopicStreamForm';
-import TopicStreamWidget from '../components/TopicStreamWidget'; // Correct relative path
-import { format } from 'date-fns';
+import TopicStreamWidget from '../components/TopicStreamWidget';
+import { format, parseISO } from 'date-fns';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import DeepDiveChat from '../components/DeepDiveChat';
-import { formatDistanceToNowStrict, parseISO } from 'date-fns';
-import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
+import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp';
+import ThemeSelector from '../components/ThemeSelector';
+import StreamSidebar from '../components/StreamSidebar';
+import StreamLoadingOverlay from '../components/StreamLoadingOverlay';
 
 const Dashboard = () => {
-  const { user, logout } = useContext(AuthContext);
-  const { theme, toggleTheme } = useTheme();
+  const { user } = useContext(AuthContext);
   const [topicStreams, setTopicStreams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('trendpulse-view-mode') || 'grid');
+  const [summaries, setSummaries] = useState([]);
+  const [selectedSummary, setSelectedSummary] = useState(null);
+  const [showDeepDive, setShowDeepDive] = useState(false);
+  const [sortMode, setSortMode] = useState('manual');
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [newlyCreatedStreamId, setNewlyCreatedStreamId] = useState(null);
+  const [selectedTheme, setSelectedTheme] = useState(() => 
+    localStorage.getItem('trendpulse-theme') || 'theme-zinc'
+  );
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedStream, setSelectedStream] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [viewMode, setViewMode] = useState('list'); // 'list', 'grid', or 'mobile'
+  
+  // Additional state variables
+  const [currentMobileIndex, setCurrentMobileIndex] = useState(0);
+  const [loadingSummaries, setLoadingSummaries] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [creatingStream, setCreatingStream] = useState(false);
+  const [creationProgress, setCreationProgress] = useState(0);
+  const [creationMessage, setCreationMessage] = useState('');
+  
+  // Drag and drop state - Enhanced with insertion position
   const [draggedStreamId, setDraggedStreamId] = useState(null);
   const [dragOverStreamId, setDragOverStreamId] = useState(null);
-  const [currentMobileIndex, setCurrentMobileIndex] = useState(0);
-  const [allSummaries, setAllSummaries] = useState([]);
-  const [loadingSummaries, setLoadingSummaries] = useState(false);
-  const [showDeepDive, setShowDeepDive] = useState(false);
-  const [selectedSummary, setSelectedSummary] = useState(null);
-  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
-  const [lastViewed, setLastViewed] = useState({}); // State to hold last viewed timestamps { streamId: timestamp }
-  const [sortBy, setSortBy] = useState('last_updated'); // 'last_updated'
-  const [sortDirection, setSortDirection] = useState('desc'); // 'asc' or 'desc'
-  const [sortMode, setSortMode] = useState('last_updated'); // Default to last_updated
-  
-  // Function to toggle between view modes
-  const toggleViewMode = () => {
-    const newMode = viewMode === 'list' ? 'grid' : 
-                   viewMode === 'grid' ? 'mobile' : 'list';
-    
-    setViewMode(newMode);
-    
-    // If switching to mobile view, fetch all summaries
-    if (newMode === 'mobile' && allSummaries.length === 0) {
-      fetchAllSummaries();
+  const [dragInsertionIndex, setDragInsertionIndex] = useState(null);
+
+  // Add ref for stream scrolling
+  const streamRefs = useRef({});
+
+  // Function to scroll to a specific stream
+  const scrollToStream = (streamId) => {
+    const streamElement = streamRefs.current[streamId];
+    if (streamElement) {
+      streamElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
     }
   };
 
-  // Get the view mode icon and text based on current mode
-  const getViewModeUI = () => {
-    switch(viewMode) {
-      case 'list':
-        return { icon: '📋', text: 'List View' };
-      case 'grid':
-        return { icon: '📊', text: 'Grid View' };
-      case 'mobile':
-        return { icon: '📱', text: 'Feed' };
-      default:
-        return { icon: '📋', text: 'List View' };
-    }
+  // Handle stream selection from sidebar
+  const handleStreamSelect = (stream) => {
+    setSelectedStream(stream);
+    // Scroll to the stream after a brief delay to ensure rendering
+    setTimeout(() => {
+      scrollToStream(stream.id);
+    }, 100);
   };
+
+  // Helper function for intuitive view mode switching (Apple-style UX)
+  const changeViewMode = (newMode) => {
+    // If form is open, close it when switching views for intuitive UX
+    if (showForm) {
+      setShowForm(false);
+      // Optional: Could add a subtle toast notification here for user feedback
+      // but Apple design philosophy prefers invisible, predictable interactions
+    }
+    setViewMode(newMode);
+  };
+  
+  // Keyboard shortcuts for power users
+  useKeyboardShortcuts([
+    {
+      key: 'cmd+n',
+      action: () => setShowForm(true),
+      description: 'Create new stream'
+    },
+    {
+      key: 'cmd+1', 
+      action: () => changeViewMode('list'),
+      description: 'Switch to list view'
+    },
+    {
+      key: 'cmd+2',
+      action: () => changeViewMode('grid'), 
+      description: 'Switch to grid view'
+    },
+    {
+      key: 'cmd+3',
+      action: () => changeViewMode('mobile'),
+      description: 'Switch to feed view'
+    },
+    {
+      key: 'cmd+r',
+      action: () => fetchTopicStreams(),
+      description: 'Refresh streams'
+    },
+    {
+      key: 'cmd+b',
+      action: () => setSidebarOpen(!sidebarOpen),
+      description: 'Toggle sidebar'
+    },
+    {
+      key: 'escape',
+      action: () => {
+        if (showForm) setShowForm(false);
+        if (showDeepDive) {
+          setShowDeepDive(false);
+          setSelectedSummary(null);
+        }
+        if (showKeyboardHelp) setShowKeyboardHelp(false);
+        if (error) clearError();
+        if (sidebarOpen) setSidebarOpen(false);
+      },
+      description: 'Close modals/forms'
+    },
+    {
+      key: 'cmd+?',
+      action: () => setShowKeyboardHelp(true),
+      description: 'Show keyboard shortcuts'
+    },
+    {
+      key: 'cmd+/',
+      action: () => setShowKeyboardHelp(true),
+      description: 'Show keyboard shortcuts'
+    }
+  ]);
 
   // Fetch summaries from all streams and combine them
   const fetchAllSummaries = useCallback(async () => {
@@ -95,7 +173,7 @@ const Dashboard = () => {
         .flat()
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       
-      setAllSummaries(combinedSummaries);
+      setSummaries(combinedSummaries);
     } catch (err) {
       console.error('Failed to fetch all summaries:', err);
       setError('Failed to load feed. Please try again.');
@@ -118,7 +196,7 @@ const Dashboard = () => {
   };
 
   // Load ordered streams based on saved order (now used as secondary sort)
-  const getOrderedStreams = (streams, currentSortMode, currentSortBy, currentSortDirection) => {
+  const getOrderedStreams = (streams, currentSortMode, currentSortDirection) => {
     try {
       const savedOrder = localStorage.getItem('streamOrder');
       const orderMap = savedOrder ? JSON.parse(savedOrder) : {};
@@ -170,26 +248,6 @@ const Dashboard = () => {
     }
   };
 
-  // Save last viewed timestamps to localStorage
-  const saveLastViewed = (viewedMap) => {
-    try {
-      localStorage.setItem('lastViewed', JSON.stringify(viewedMap));
-    } catch (err) {
-      console.error('Failed to save last viewed timestamps:', err);
-    }
-  };
-
-  // Load last viewed timestamps from localStorage
-  const loadLastViewed = () => {
-    try {
-      const saved = localStorage.getItem('lastViewed');
-      return saved ? JSON.parse(saved) : {};
-    } catch (err) {
-      console.error('Failed to load last viewed timestamps:', err);
-      return {};
-    }
-  };
-
   const fetchTopicStreams = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -203,7 +261,7 @@ const Dashboard = () => {
       }
       console.log(`Setting ${data.length} topic streams.`);
       // Apply sorting based on the current sort mode and direction
-      const orderedStreams = getOrderedStreams(data, sortMode, sortBy, sortDirection);
+      const orderedStreams = getOrderedStreams(data, 'last_updated', 'desc');
       // Filter out any potentially invalid stream objects before setting state
       const validStreams = orderedStreams.filter(stream => stream && stream.id !== undefined && stream.id !== null);
 
@@ -222,7 +280,7 @@ const Dashboard = () => {
             console.log("Detected stale stream IDs in localStorage order. Clearing streamOrder.");
             localStorage.removeItem('streamOrder');
             // Re-fetch and re-order based on the now-cleared localStorage (will just use backend order)
-            const reOrderedStreams = getOrderedStreams(data, sortMode, sortBy, sortDirection);
+            const reOrderedStreams = getOrderedStreams(data, 'last_updated', 'desc');
             // Add an explicit filter to remove known problematic stream IDs (1, 2, 11)
             const finalStreams = reOrderedStreams.filter(stream => ![1, 2, 11].includes(stream.id));
             setTopicStreams(finalStreams);
@@ -259,12 +317,7 @@ const Dashboard = () => {
       setLoading(false);
       console.log("fetchTopicStreams finished.");
     }
-  }, [selectedStream, sortMode, sortBy, sortDirection]); // Added sortMode to dependency array
-
-  // Load last viewed timestamps on component mount
-  useEffect(() => {
-    setLastViewed(loadLastViewed());
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, [selectedStream]);
 
   // Refresh summaries when a new stream is created, updated, or deleted
   const refreshSummaries = () => {
@@ -283,36 +336,144 @@ const Dashboard = () => {
       setCurrentMobileIndex(0);
     }
     
-    // If switching to mobile view and we have streams, fetch summaries
-    if (viewMode === 'mobile' && topicStreams.length > 0) {
+    // Preload summaries for mobile view to prevent loading flash
+    if (topicStreams.length > 0 && summaries.length === 0) {
       fetchAllSummaries();
     }
-  }, [topicStreams, currentMobileIndex, viewMode, fetchAllSummaries]);
+  }, [topicStreams, currentMobileIndex, fetchAllSummaries, summaries.length]);
 
   const handleCreateStream = async (newStream) => {
+    setCreatingStream(true);
+    setCreationProgress(0);
+    setCreationMessage('Initializing stream creation...');
+    
+    // Array of 40 creative loading messages
+    const loadingMessages = [
+      'Awakening AI consciousness for your topic...',
+      'Sprinkling digital fairy dust on data streams...',
+      'Teaching neural networks to dream about your content...',
+      'Consulting the oracle of infinite knowledge...',
+      'Weaving threads of wisdom into your stream...',
+      'Summoning the data spirits from the cloud realm...',
+      'Crafting algorithmic poetry from raw information...',
+      'Unleashing cyber-hounds to hunt for insights...',
+      'Building bridges across the information multiverse...',
+      'Distilling essence of knowledge into liquid insights...',
+      'Conducting symphony of synchronized data flows...',
+      'Painting masterpieces with pixels of information...',
+      'Brewing the perfect blend of AI and intuition...',
+      'Launching nano-bots to explore content galaxies...',
+      'Crystallizing thoughts into streams of pure data...',
+      'Choreographing a ballet of bits and bytes...',
+      'Harvesting wisdom from the digital wilderness...',
+      'Forging neural pathways through information space...',
+      'Decoding the DNA of your chosen topic...',
+      'Assembling constellations of connected concepts...',
+      'Tuning quantum frequencies to your interests...',
+      'Sculpting information architecture from digital clay...',
+      'Pollinating ideas across the knowledge ecosystem...',
+      'Engineering serendipity into your content stream...',
+      'Translating chaos into beautiful data symphonies...',
+      'Cultivating gardens of curated intelligence...',
+      'Spinning silk threads of semantic connections...',
+      'Architecting castles in the cloud of knowledge...',
+      'Brewing potions of personalized insights...',
+      'Calibrating telescopes to peer into data futures...',
+      'Weaving magic carpets of contextual understanding...',
+      'Planting seeds in the fertile soil of information...',
+      'Conducting archaeological digs through data layers...',
+      'Harmonizing melodies of machine learning magic...',
+      'Crystallizing liquid intelligence into solid streams...',
+      'Commissioning artists to paint with pure data...',
+      'Training digital butterflies to pollinate insights...',
+      'Constructing lighthouses to guide content discovery...',
+      'Summoning genies from the lamp of limitless learning...',
+      'Finalizing the symphony of your personalized stream...'
+    ];
+    
+    let currentProgress = 0;
+    let isCompleted = false;
+    let currentMessageIndex = 0;
+    
+    // Function to update progress smoothly over 35 seconds
+    const updateProgress = () => {
+      if (isCompleted) return;
+      
+      // Increment progress by small amounts to reach 95% over ~33 seconds
+      const progressIncrement = 95 / (35 * 1000 / 200); // 200ms intervals
+      currentProgress = Math.min(currentProgress + progressIncrement, 95);
+      setCreationProgress(currentProgress);
+      
+      // Don't complete the progress bar until the API call is done
+      if (currentProgress < 95) {
+        setTimeout(updateProgress, 200);
+      }
+    };
+    
+    // Function to cycle through random messages every 2-3 seconds
+    const updateMessage = () => {
+      if (isCompleted) return;
+      
+      currentMessageIndex = Math.floor(Math.random() * loadingMessages.length);
+      setCreationMessage(loadingMessages[currentMessageIndex]);
+      
+      // Random interval between 2-4 seconds
+      const nextInterval = 2000 + Math.random() * 2000;
+      setTimeout(updateMessage, nextInterval);
+    };
+    
+    // Start progress and message updates
+    updateProgress();
+    updateMessage();
+
     try {
       const createdStream = await topicStreamAPI.create(newStream);
-      // Add the new stream to the beginning of the list
-      const updatedStreams = [createdStream, ...topicStreams];
-      setTopicStreams(updatedStreams);
-      setSelectedStream(createdStream);
-      setShowForm(false);
-      refreshSummaries();
-      // Save the new order immediately including the newly created stream at the top
-      saveStreamOrder(updatedStreams);
-    } catch (err) {
-      setError('Failed to create topic stream. Please try again.');
-      console.error(err);
-      // Re-throw the error to be handled by the form component
-      throw err;
+      
+      // Mark as completed and finish the progress bar quickly
+      isCompleted = true;
+      setCreationMessage('Success! Stream created and first summary generated.');
+      
+      // Complete the progress bar quickly if it's not already at 100%
+      const finishProgress = () => {
+        setCreationProgress(prev => {
+          if (prev >= 100) return 100;
+          const newProgress = Math.min(prev + 5, 100);
+          if (newProgress < 100) {
+            setTimeout(finishProgress, 50);
+          }
+          return newProgress;
+        });
+      };
+      finishProgress();
+      
+      // Wait a moment to show success message
+      setTimeout(() => {
+        setTopicStreams(prevStreams => [createdStream, ...prevStreams]);
+        setSelectedStream(createdStream);
+        setShowForm(false);
+        setCreatingStream(false);
+        setCreationProgress(0);
+        setCreationMessage('');
+        refreshSummaries();
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error creating stream:', error);
+      isCompleted = true;
+      setCreatingStream(false);
+      setCreationProgress(0);
+      setCreationMessage('');
+      setError('Failed to create stream. Please try again.');
     }
   };
 
   const handleDeleteStream = async (id) => {
-    setIsDeleting(true);
+    console.log('🎯 Dashboard handleDeleteStream called with ID:', id);
     setError('');
     try {
+      console.log('🌐 Making API call to delete stream:', id);
       await topicStreamAPI.delete(id);
+      console.log('✅ API call successful, updating state');
       const updatedStreams = topicStreams.filter(stream => stream.id !== id);
       setTopicStreams(updatedStreams);
       
@@ -321,12 +482,12 @@ const Dashboard = () => {
       }
       
       // Update summaries by removing ones from the deleted stream
-      setAllSummaries(prev => prev.filter(summary => summary.streamId !== id));
+      setSummaries(prev => prev.filter(summary => summary.streamId !== id));
+      console.log('🎉 Stream delete complete');
     } catch (err) {
+      console.error('❌ Delete stream failed:', err);
       setError(`Failed to delete topic stream: ${err.response?.data?.detail || 'Unknown error'}`);
       console.error(err);
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -364,7 +525,7 @@ const Dashboard = () => {
         setError('No new information is available since the last update.');
       } else {
         // Add the new summary to the combined list (keeping this for mobile view feed)
-        setAllSummaries(prev => [
+        setSummaries(prev => [
           {
             ...newSummary,
             streamQuery: topicStreams.find(s => s.id === id)?.query || '', // Get query from state
@@ -385,7 +546,7 @@ const Dashboard = () => {
               streamsCopy[streamIndex] = updatedStream; // Replace with the fetched updated stream
           }
           // Re-sort the streams based on the current sort mode and direction
-          const sortedStreams = getOrderedStreams(streamsCopy, sortMode, sortBy, sortDirection);
+          const sortedStreams = getOrderedStreams(streamsCopy, 'last_updated', 'desc');
           // Apply the filter for problematic IDs just in case
           return sortedStreams.filter(stream => ![1, 2, 11].includes(stream.id));
       });
@@ -403,32 +564,6 @@ const Dashboard = () => {
     }
   };
 
-  const handleAppendSummary = async (newSummary) => {
-    try {
-      // This function is called from DeepDiveChat when a summary is saved from chat
-      // We need to update the allSummaries state
-      setAllSummaries(prev => [
-        {
-          ...newSummary,
-          streamQuery: selectedStream?.query || '', // Use the selected stream's query
-          streamId: selectedStream?.id || null, // Use the selected stream's ID
-        },
-        ...prev
-      ]);
-      setError(''); // Clear any previous errors
-    } catch (err) {
-       console.error('Failed to append summary to state:', err);
-       // Optionally set an error state if needed
-       // setError('Failed to add summary to feed.');
-    }
-  };
-
-  const clearError = () => {
-    setError('');
-  };
-
-  const viewModeUI = getViewModeUI();
-
   const handleDragStart = (e, streamId) => {
     setDraggedStreamId(streamId);
     e.dataTransfer.effectAllowed = 'move';
@@ -439,6 +574,7 @@ const Dashboard = () => {
   const handleDragEnd = (e) => {
     setDraggedStreamId(null);
     setDragOverStreamId(null);
+    setDragInsertionIndex(null);
     // Reset opacity
     e.target.style.opacity = '1';
   };
@@ -446,28 +582,136 @@ const Dashboard = () => {
   const handleDragOver = (e, streamId) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    
     if (streamId !== draggedStreamId) {
+      const streams = getOrderedStreams(topicStreams, 'manual', 'asc');
+      const targetIndex = streams.findIndex(stream => stream.id === streamId);
+      
+      // Calculate mouse position relative to the target element
+      const rect = e.currentTarget.getBoundingClientRect();
+      const mouseY = e.clientY;
+      const elementMiddle = rect.top + rect.height / 2;
+      
+      // Determine insertion index based on mouse position
+      let insertionIndex;
+      if (mouseY < elementMiddle) {
+        // Insert before target
+        insertionIndex = targetIndex;
+      } else {
+        // Insert after target
+        insertionIndex = targetIndex + 1;
+      }
+      
       setDragOverStreamId(streamId);
+      setDragInsertionIndex(insertionIndex);
+    }
+  };
+
+  // Enhanced container drag over that calculates position based on mouse Y coordinate
+  const handleContainerDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (draggedStreamId) {
+      const streams = getOrderedStreams(topicStreams, 'manual', 'asc');
+      const container = e.currentTarget;
+      const containerRect = container.getBoundingClientRect();
+      const mouseY = e.clientY;
+      
+      // Get all stream elements to calculate their positions
+      const streamElements = container.querySelectorAll('[data-stream-id]');
+      let insertionIndex = streams.length; // Default to end
+      
+      // Find the correct insertion point based on mouse position
+      for (let i = 0; i < streamElements.length; i++) {
+        const element = streamElements[i];
+        const elementRect = element.getBoundingClientRect();
+        const elementTop = elementRect.top;
+        const elementMiddle = elementTop + elementRect.height / 2;
+        
+        if (mouseY < elementTop) {
+          // Mouse is above this element, insert before it
+          insertionIndex = i;
+          break;
+        } else if (mouseY < elementMiddle) {
+          // Mouse is in the upper half of this element, insert before it
+          insertionIndex = i;
+          break;
+        } else if (mouseY < elementRect.bottom) {
+          // Mouse is in the lower half of this element, insert after it
+          insertionIndex = i + 1;
+          break;
+        }
+      }
+      
+      // Special case: if mouse is above the first element or container is empty
+      if (streamElements.length > 0) {
+        const firstElementRect = streamElements[0].getBoundingClientRect();
+        if (mouseY < firstElementRect.top) {
+          insertionIndex = 0;
+        }
+      }
+      
+      setDragInsertionIndex(insertionIndex);
+      setDragOverStreamId(null);
     }
   };
 
   const handleDrop = (e, targetStreamId) => {
     e.preventDefault();
-    if (draggedStreamId !== targetStreamId) {
-      // Reorder the streams
-      const newTopicStreams = [...topicStreams];
-      const draggedStreamIndex = newTopicStreams.findIndex(stream => stream.id === draggedStreamId);
-      const targetStreamIndex = newTopicStreams.findIndex(stream => stream.id === targetStreamId);
+    if (draggedStreamId && dragInsertionIndex !== null) {
+      // Reorder the streams based on insertion index
+      const streams = getOrderedStreams(topicStreams, 'manual', 'asc');
+      const draggedStreamIndex = streams.findIndex(stream => stream.id === draggedStreamId);
       
+      if (draggedStreamIndex !== -1) {
+        const newTopicStreams = [...streams];
       const [draggedStream] = newTopicStreams.splice(draggedStreamIndex, 1);
-      newTopicStreams.splice(targetStreamIndex, 0, draggedStream);
+        
+        // Adjust insertion index if removing item from before the insertion point
+        let finalInsertionIndex = dragInsertionIndex;
+        if (draggedStreamIndex < dragInsertionIndex) {
+          finalInsertionIndex--;
+        }
+        
+        newTopicStreams.splice(finalInsertionIndex, 0, draggedStream);
       
       setTopicStreams(newTopicStreams);
       // Save the new order to localStorage
       saveStreamOrder(newTopicStreams);
+      }
     }
     setDraggedStreamId(null);
     setDragOverStreamId(null);
+    setDragInsertionIndex(null);
+  };
+
+  // Simplified container drop that uses the calculated insertion index
+  const handleContainerDrop = (e) => {
+    e.preventDefault();
+    if (draggedStreamId && dragInsertionIndex !== null) {
+      const streams = getOrderedStreams(topicStreams, 'manual', 'asc');
+      const draggedStreamIndex = streams.findIndex(stream => stream.id === draggedStreamId);
+      
+      if (draggedStreamIndex !== -1) {
+        const newTopicStreams = [...streams];
+        const [draggedStream] = newTopicStreams.splice(draggedStreamIndex, 1);
+        
+        // Adjust insertion index if removing item from before the insertion point
+        let finalInsertionIndex = dragInsertionIndex;
+        if (draggedStreamIndex < dragInsertionIndex) {
+          finalInsertionIndex--;
+        }
+        
+        newTopicStreams.splice(finalInsertionIndex, 0, draggedStream);
+        
+        setTopicStreams(newTopicStreams);
+        saveStreamOrder(newTopicStreams);
+      }
+    }
+    setDraggedStreamId(null);
+    setDragOverStreamId(null);
+    setDragInsertionIndex(null);
   };
 
   // Render a single summary item for the mobile feed
@@ -482,7 +726,7 @@ const Dashboard = () => {
             <div className="flex flex-col items-end flex-shrink-0">
               {/* Time Since Last Update tag */}
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-black dark:text-white font-medium">
-                {summary.created_at ? formatInTimeZone(toZonedTime(parseISO(summary.created_at + 'Z'), Intl.DateTimeFormat().resolvedOptions().timeZone), Intl.DateTimeFormat().resolvedOptions().timeZone, 'MMM d, yyyy h:mm a') : ''}
+                {summary.created_at ? format(parseISO(summary.created_at), 'MMM d, yyyy h:mm a') : ''}
               </span>
               {/* Deep Dive Chat button */}
               <button
@@ -529,7 +773,7 @@ const Dashboard = () => {
               onClick={() => {
                 const streamIndex = topicStreams.findIndex(s => s.id === summary.streamId);
                 if (streamIndex >= 0) {
-                  setViewMode('list');
+                  changeViewMode('list');
                   setSelectedStream(topicStreams[streamIndex]);
                 }
               }}
@@ -549,12 +793,12 @@ const Dashboard = () => {
                 Thoughts (experimental)
               </div>
               <div className="prose prose-sm max-w-none dark:prose-invert">
-                <MarkdownRenderer content={summary.thoughts} />
+                <MarkdownRenderer content={summary.thoughts} sources={summary.sources} />
               </div>
             </div>
           )}
-          <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? '' : ''}`}>
-            <MarkdownRenderer content={summary.content || ''} />
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            <MarkdownRenderer content={summary.content || ''} sources={summary.sources} />
           </div>
         </div>
         
@@ -584,406 +828,432 @@ const Dashboard = () => {
     );
   };
 
+  const clearError = () => {
+    setError('');
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="shadow-sm border-b bg-background border-border sticky top-0 z-20 w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 
-            className="text-3xl font-bold text-foreground cursor-pointer hover:text-primary transition-colors"
-            onClick={() => window.location.href = '/'}
-          >
-            <img src="/trendpulse_logo_1.svg" alt="TrendPulse Logo" className="inline-block h-9 w-9 mr-2 align-text-bottom" />
-            TrendPulse Dashboard
-          </h1>
-          {/* Down arrow button to scroll to More Streams - only show in grid view if there are more than 5 streams */}
-          {viewMode === 'grid' && topicStreams.length > 5 && !loading && (
-            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
+    <div className="min-h-screen bg-background flex">
+      {/* Stream Sidebar */}
+      <StreamSidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        streams={getOrderedStreams(topicStreams, 'manual', 'asc')}
+        selectedStream={selectedStream}
+        onSelectStream={handleStreamSelect}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onContainerDragOver={handleContainerDragOver}
+        onContainerDrop={handleContainerDrop}
+        draggedStreamId={draggedStreamId}
+        dragOverStreamId={dragOverStreamId}
+        dragInsertionIndex={dragInsertionIndex}
+        onCreateNew={() => setShowForm(true)}
+        onDeleteStream={handleDeleteStream}
+        onUpdateNow={handleUpdateNow}
+      />
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-screen">
+        {/* Enhanced Header */}
+        <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="px-4 sm:px-6 lg:px-8">
+            <div className="flex h-16 items-center justify-between">
+              {/* Left side with sidebar toggle and Logo */}
+              <div className="flex items-center space-x-3">
+                {/* Sidebar Toggle Button */}
               <button
-                onClick={() => {
-                const element = document.getElementById('more-streams-section');
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth' });
-                }
-                }}
-                className="p-2 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-colors shadow-md"
-                title="Scroll to More Streams"
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-200 hover:scale-105 active:scale-95"
+                  title="Toggle Sidebar (⌘B)"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                          d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
+                
+                {/* Logo and Title */}
+                <div 
+                  className="flex items-center space-x-3 cursor-pointer group"
+                  onClick={() => window.location.href = '/'}
+                >
+                  <img 
+                    src="/trendpulse_logo_1.svg" 
+                    alt="TrendPulse" 
+                    className="h-8 w-8 transition-transform group-hover:scale-105" 
+                  />
+                  <div>
+                    <h1 className="text-xl font-semibold text-foreground tracking-tight">
+                      TrendPulse
+                    </h1>
+                    <p className="text-xs text-muted-foreground">
+                      Welcome back, {user?.email}
+                    </p>
             </div>
-          )}
-          <div className="flex items-center space-x-4">
+                </div>
+              </div>
+
+              {/* Center Controls */}
+              <div className="flex items-center space-x-6">
+                {/* 3-Position View Mode Slider */}
+                <div className="relative bg-muted/50 rounded-lg p-1 flex items-center border view-mode-slider">
+                  {/* Sliding background indicator */}
+                  <div 
+                    className="absolute top-1 bottom-1 bg-primary rounded-md shadow-sm view-mode-slider-indicator"
+                    style={{
+                      width: '32%',
+                      left: viewMode === 'list' ? '2%' : viewMode === 'grid' ? '34%' : '66%'
+                    }}
+                  />
+                  
+                  {/* List View */}
             <button
-              onClick={toggleViewMode}
-              className="mr-4 text-sm px-3 py-1 rounded bg-primary text-primary-foreground border border-primary/50 hover:bg-primary/90 flex items-center"
-            >
-              <span className="mr-1">{viewModeUI.icon}</span> {viewModeUI.text}
+                    onClick={() => changeViewMode('list')}
+                    className={`relative z-10 px-3 py-1.5 text-xs font-medium rounded-md flex items-center space-x-1.5 view-mode-button ${
+                      viewMode === 'list' 
+                        ? 'text-primary-foreground' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title="List View"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 12h11M9 6h11M9 18h11M5 12h.01M5 6h.01M5 18h.01"/>
+                    </svg>
+                    <span className="hidden sm:inline">List</span>
             </button>
+                  
+                  {/* Grid View */}
             <button
-              onClick={toggleTheme}
-              className="mr-4 text-sm px-3 py-1 rounded bg-muted text-muted-foreground border border-border hover:bg-muted/80"
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+                    onClick={() => changeViewMode('grid')}
+                    className={`relative z-10 px-3 py-1.5 text-xs font-medium rounded-md flex items-center space-x-1.5 view-mode-button ${
+                      viewMode === 'grid' 
+                        ? 'text-primary-foreground' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title="Grid View"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
+                    </svg>
+                    <span className="hidden sm:inline">Grid</span>
             </button>
-            <span className="text-xs text-muted-foreground">{user?.email}</span>
+
+                  {/* Mobile/Feed View */}
             <button 
-              onClick={logout}
-              className="text-xs text-muted-foreground hover:text-primary"
+                    onClick={() => changeViewMode('mobile')}
+                    className={`relative z-10 px-3 py-1.5 text-xs font-medium rounded-md flex items-center space-x-1.5 view-mode-button ${
+                      viewMode === 'mobile' 
+                        ? 'text-primary-foreground' 
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title="Feed View"
             >
-              Sign out
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="6" y="2" width="12" height="20" rx="2" ry="2"/>
+                      <path d="M9 22V12h6v10"/>
+                    </svg>
+                    <span className="hidden sm:inline">Feed</span>
             </button>
           </div>
         </div>
-      </header>
 
-      {/* Main content wrapper for width control */}
-      <main className="py-6">
-        <div className={`${viewMode === 'grid' ? 'container-fluid mx-auto' : 'max-w-7xl mx-auto'} px-4 sm:px-6 lg:px-8`}>
-          {error && (
-            <div className="mb-4 bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded" data-testid="error-message">
-              {error}
+              {/* Right Controls */}
+              <div className="flex items-center space-x-3">
+                {/* Theme Selector */}
+                <ThemeSelector />
+
+                {/* Keyboard shortcuts button */}
               <button 
-                className="float-right font-bold"
-                onClick={clearError}
-                aria-label="Close error message"
-              >
-                ×
+                  onClick={() => setShowKeyboardHelp(true)}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-200"
+                  title="Keyboard Shortcuts (⌘?)"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
               </button>
+
+                {/* Sign out button */}
+                <button className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 hover:scale-105 active:scale-95 transition-all duration-200">
+                  Sign Out
+                    </button>
+                  </div>
+                </div>
+                  </div>
+
+          {/* Progress indicator for loading states */}
+          {loading && (
+            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-muted overflow-hidden">
+              <div className="h-full bg-primary animate-pulse" style={{ width: '100%' }} />
+                </div>
+          )}
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8 overflow-auto">
+          {/* Error Display with enhanced design */}
+          {error && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start space-x-3 animate-in slide-in-from-top-2 duration-300">
+              <svg className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 9v4M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-destructive">{error}</p>
+                    </div>
+                    <button
+                onClick={clearError}
+                className="text-destructive/60 hover:text-destructive transition-colors p-1 rounded-md hover:bg-destructive/10"
+                    >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+                    </button>
+                  </div>
+          )}
+                      
+          {/* Success Display with Apple-style design */}
+          {successMessage && (
+            <div className="mb-6 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/30 rounded-lg flex items-start space-x-3 animate-in slide-in-from-top-2 duration-300">
+              <svg className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 12l2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">{successMessage}</p>
+                      </div>
+                      <button
+                onClick={() => setSuccessMessage('')}
+                className="text-green-600/60 hover:text-green-600 dark:text-green-400/60 dark:hover:text-green-400 transition-colors p-1 rounded-md hover:bg-green-100 dark:hover:bg-green-900/30"
+                      >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+                      </button>
+                    </div>
+                    )}
+
+          {/* Create Stream Form */}
+          {showForm && (
+            <div className="mb-8 bg-card border border-border rounded-xl shadow-sm animate-in slide-in-from-top-2 duration-300 relative overflow-hidden">
+              {!creatingStream ? (
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-semibold text-foreground">Create New Topic Stream</h2>
+                    <button
+                      onClick={() => setShowForm(false)}
+                      className="p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent transition-colors"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <TopicStreamForm 
+                    onSubmit={handleCreateStream}
+                    onCancel={() => setShowForm(false)}
+                  />
+                </div>
+              ) : (
+                <div className="relative min-h-[500px]">
+                  <StreamLoadingOverlay 
+                    message={creationMessage}
+                    subMessage="This may take a few moments as we set up your personalized AI search"
+                    progress={creationProgress}
+                    isModal={true}
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          {viewMode === 'mobile' ? (
-            <div className="flex flex-col">
-              {/* Mobile View Header - moved inside the container */}
-              {!showForm && topicStreams.length > 0 && !loading && !loadingSummaries && allSummaries.length > 0 ? (
-                <div className="mobile-feed pb-16 max-w-3xl mx-auto">
-                  <div className="flex justify-between items-center pt-2 pb-4 bg-background z-40">
-                    <h2 className="text-xl font-medium text-foreground">Latest Updates</h2>
-                    <button
-                      onClick={() => setShowForm(true)}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
-                    >
-                      New Stream
-                    </button>
-                  </div>
-                  
-                  {/* Chronological feed of all summaries */}
-                  {allSummaries.map(summary => renderSummaryItem(summary))}
-                </div>
-              ) : (
-                <>
-                  {/* Mobile View Header - for empty states and form */}
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-medium text-foreground">Latest Updates</h2>
-                    <button
-                      onClick={() => setShowForm(true)}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
-                    >
-                      New Stream
-                    </button>
-                  </div>
-
-                  {/* Mobile View Content */}
-                  {loading || loadingSummaries ? (
-                    <div className="p-4 text-center text-muted-foreground">
-                      <div className="animate-pulse flex justify-center items-center space-x-2">
-                        <div className="w-3 h-3 bg-primary/50 rounded-full"></div>
-                        <div className="w-3 h-3 bg-primary/50 rounded-full"></div>
-                        <div className="w-3 h-3 bg-primary/50 rounded-full"></div>
+          {/* Loading State */}
+          {loading ? (
+            <div className="space-y-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-32 bg-muted/50 rounded-xl"></div>
                       </div>
-                      <p className="mt-2">Loading your feed...</p>
-                    </div>
-                  ) : topicStreams.length === 0 ? (
-                    <div className="p-8 text-center bg-card rounded-lg shadow-sm border border-border">
-                      <p className="text-muted-foreground mb-4">No topic streams yet. Create your first one!</p>
-                      <button
-                        onClick={() => setShowForm(true)}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded"
-                      >
-                        New Stream
-                      </button>
-                    </div>
-                  ) : showForm ? (
-                    <div className="bg-card rounded-lg shadow-sm p-6 border border-border">
-                      <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-medium text-foreground">Create New Topic Stream</h2>
-                        <button
-                          onClick={() => setShowForm(false)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      <TopicStreamForm onSubmit={handleCreateStream} />
-                    </div>
-                  ) : allSummaries.length === 0 ? (
-                    <div className="p-8 text-center bg-card rounded-lg shadow-sm border border-border">
-                      <p className="text-muted-foreground mb-4">No updates in your feed yet.</p>
-                      <p className="text-muted-foreground mb-4">Try updating one of your streams to see content here.</p>
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-12 gap-6">
-              {/* Sidebar: Conditionally render in DOM based on viewMode to simplify layout management */}
-              {viewMode === 'list' && (
-                <div className="col-span-12 md:col-span-3 rounded-lg shadow-sm bg-card border border-border sticky top-[69px] max-h-[calc(100vh-69px)] overflow-x-hidden">
-                  <div className="p-4 border-b border-border">
-                    {/* Header Row */}
-                    <div className="flex justify-between items-center mb-2">
-                      <h2 className="text-lg font-medium text-foreground">Topic Streams</h2>
-                      <button
-                        onClick={() => setShowForm(true)}
-                        className="bg-muted hover:bg-muted/80 text-foreground px-3 py-1 rounded text-sm border border-border"
-                        data-testid="new-stream-button"
-                      >
-                        New Stream
-                      </button>
-                    </div>
-                    
-                    {/* Drag to reorder text below header row */}
-                    {!loading && topicStreams.length > 0 && (
-                      <div className="text-xs text-muted-foreground italic flex items-center mt-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                        </svg>
-                        Drag to reorder
-                      </div>
-                    )}
-
-                    {/* Sort Toggle Button */}
-                    {!loading && topicStreams.length > 0 && (
-                      <button
-                        onClick={() => {
-                           if (sortMode === 'manual') {
-                              setSortMode('last_updated');
-                              setSortDirection('desc'); // Default to newest first when switching to last_updated sort
-                           } else if (sortDirection === 'desc') {
-                              setSortDirection('asc'); // Toggle direction if already sorting by last_updated
-                           } else {
-                              setSortMode('manual'); // Switch back to manual if already oldest first
-                           }
-                        }}
-                        className="mt-2 text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full hover:bg-muted/80"
-                      >
-                        Sort by: {sortMode === 'manual' ? 'Manual Order' : `Last Updated (${sortDirection === 'desc' ? 'Newest First' : 'Oldest First'})`}
-                      </button>
-                    )}
-                  </div>
-                  
-                  {/* Scrollable content area for streams */}
-                  <div className="overflow-y-auto overflow-x-hidden flex-1">
-                    {loading ? (
-                      <div className="p-4 text-center text-muted-foreground" data-testid="loading-indicator">
-                        <p>Loading streams...</p>
-                      </div>
-                    ) : topicStreams.length === 0 ? (
-                      <div className="p-4 text-center text-muted-foreground" data-testid="empty-streams-message">
-                        <p>No topic streams yet. Create your first one!</p>
+              ))}
                       </div>
                     ) : (
-                      <ul className="divide-y divide-border" data-testid="stream-list">
-                        {topicStreams.map(stream => (
-                          <li 
-                            key={stream.id} 
-                            data-testid={`stream-item-${stream.id}`}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, stream.id)}
-                            onDragEnd={handleDragEnd}
-                            onDragOver={(e) => handleDragOver(e, stream.id)}
-                            onDrop={(e) => handleDrop(e, stream.id)}
-                            className={`${dragOverStreamId === stream.id ? 'border-2 border-primary' : ''} ${draggedStreamId === stream.id ? 'opacity-50' : 'opacity-100'}`}
-                          >
-                            <button
-                              className={`w-full text-left p-4 hover:bg-muted/50 flex items-center ${selectedStream?.id === stream.id ? 'bg-muted dark:bg-primary/20' : ''}`}
-                              onClick={() => {
-                                setSelectedStream(stream);
-                                const updatedLastViewed = { ...lastViewed, [stream.id]: new Date().toISOString() };
-                                setLastViewed(updatedLastViewed);
-                                saveLastViewed(updatedLastViewed);
-                              }}
-                            >
-                              <div className="mr-2 cursor-move text-muted-foreground">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                </svg>
+            <>
+              {/* Content based on view mode */}
+              {viewMode === 'mobile' ? (
+                <div key={`mobile-view-${viewMode}`} className="mobile-feed-view">
+                  {summaries.length > 0 ? (
+                    <div className="space-y-6">
+                      {summaries.map((summary) => renderSummaryItem(summary))}
                               </div>
-                              <div className="flex-1">
-                                <div className="font-medium text-foreground h-[3.25rem] line-clamp-2 overflow-hidden" title={stream.query}>
-                                  {stream.query}
+                  ) : (
+                    <div className="space-y-4">
+                      {loadingSummaries ? (
+                        // Show skeleton loading with consistent height
+                        [1, 2, 3].map((i) => (
+                          <div key={i} className="animate-pulse bg-card rounded-xl p-4 border min-h-[200px]">
+                            <div className="flex space-x-3">
+                              <div className="rounded-full bg-muted h-10 w-10"></div>
+                              <div className="flex-1 space-y-2">
+                                <div className="h-4 bg-muted rounded w-3/4"></div>
+                                <div className="h-3 bg-muted rounded w-1/2"></div>
+                                <div className="h-3 bg-muted rounded w-2/3"></div>
                                 </div>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {stream.update_frequency} • {stream.detail_level}
                                 </div>
+                            <div className="mt-4 space-y-2">
+                              <div className="h-3 bg-muted rounded w-full"></div>
+                              <div className="h-3 bg-muted rounded w-5/6"></div>
+                              <div className="h-3 bg-muted rounded w-4/5"></div>
                               </div>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
                   </div>
+                        ))
+                      ) : (
+                        // Empty state
+                        <div className="text-center py-12">
+                          <svg className="w-12 h-12 text-muted-foreground mx-auto mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 2L13.09 8.26L19 9L13.09 9.74L12 16L10.91 9.74L5 9L10.91 8.26L12 2Z"/>
+                          </svg>
+                          <p className="text-muted-foreground">No summaries available yet</p>
                 </div>
               )}
-
-              {/* Main content area */}
-              <div className={`${viewMode === 'list' ? 'col-span-12 md:col-span-9' : 'col-span-12'}`}>
-                {showForm ? (
-                  <div className="rounded-lg shadow-sm p-6 bg-card border border-border">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-medium text-foreground">Create New Topic Stream</h2>
-                      <button
-                        onClick={() => setShowForm(false)}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        Cancel
-                      </button>
                     </div>
-                    <TopicStreamForm onSubmit={handleCreateStream} />
+                  )}
                   </div>
-                ) : viewMode === 'grid' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 auto-rows-auto">
-                    {/* We're going to render the top streams first, with consistent heights */}
-                    <div className="col-span-full pb-4 mb-4 flex flex-wrap gap-8">
-                      {topicStreams.slice(0, 5).map(stream => (
-                        <div key={stream.id} className="flex-1 min-w-[300px]" style={{ maxWidth: 'calc(25% - 24px)' }}>
-                          <TopicStreamWidget
-                            stream={stream}
-                            onDelete={() => handleDeleteStream(stream.id)}
-                            onUpdate={handleUpdateStream}
-                            isGridView={true} 
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* Button to scroll to More Streams - only show if there are more than 5 streams */}
-                    {topicStreams.length > 5 && (
-                      <div className="col-span-full text-center mb-4">
+              ) : (
+                <div key={`${viewMode}-view-${topicStreams.length}`} className="streams-view">
+                  {topicStreams.length === 0 ? (
+                    <div className="text-center py-16">
+                      <svg className="w-16 h-16 text-muted-foreground mx-auto mb-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 2L13.09 8.26L19 9L13.09 9.74L12 16L10.91 9.74L5 9L10.91 8.26L12 2Z"/>
+                      </svg>
+                      <h3 className="text-xl font-semibold text-foreground mb-2">No Topic Streams Yet</h3>
+                      <p className="text-muted-foreground mb-6">Create your first topic stream to start tracking trends</p>
                         <button
-                          onClick={() => {
-                            const element = document.getElementById('more-streams-section');
-                            if (element) {
-                              element.scrollIntoView({ behavior: 'smooth' });
-                            }
-                          }}
-                          className="p-2 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-colors"
-                          title="Scroll to More Streams"
+                        onClick={() => setShowForm(true)}
+                        className="inline-flex items-center space-x-2 px-6 py-3 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 hover-lift"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 5v14M5 12h14"/>
                           </svg>
+                        <span>Create First Stream</span>
                         </button>
                       </div>
-                    )}
-                    
-                    {/* Render remaining streams if there are more than 5 */}
-                    {topicStreams.length > 5 && (
-                      <>
-                        <div id="more-streams-section" className="col-span-full border-t border-border py-4 mb-4">
-                          <h3 className="text-md font-medium text-foreground">More Streams</h3>
+                  ) : (
+                    // Show all streams
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-semibold text-foreground">
+                          {selectedStream ? selectedStream.query : 'All Streams'}
+                        </h2>
+                        <div className="flex items-center space-x-4">
+                          {selectedStream && (
+                            <button
+                              onClick={() => setSelectedStream(null)}
+                              className="text-sm px-3 py-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent transition-colors"
+                            >
+                              Show All Streams
+                            </button>
+                          )}
+                          <div className="text-sm text-muted-foreground">
+                            {selectedStream ? 'Focused view' : `${topicStreams.length} streams`}
                         </div>
-                        {topicStreams.slice(5).map(stream => (
-                          <div key={stream.id}>
-                            <TopicStreamWidget
+                        </div>
+                      </div>
+                      
+                      <div className={viewMode === 'grid' 
+                        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
+                        : 'space-y-6'
+                      }>
+                        {topicStreams.map((stream, index) => (
+                          <div
                               key={stream.id}
+                            ref={el => streamRefs.current[stream.id] = el}
+                            className={`transition-all duration-300 ${
+                              selectedStream?.id === stream.id 
+                                ? 'ring-2 ring-primary/50 ring-offset-2 ring-offset-background' 
+                                : ''
+                            }`}
+                          >
+                            <TopicStreamWidget
                               stream={stream}
-                              onDelete={() => handleDeleteStream(stream.id)}
+                              onDelete={handleDeleteStream}
                               onUpdate={handleUpdateStream}
-                              isGridView={true} 
+                              isGridView={viewMode === 'grid'}
+                              onDragStart={(e) => handleDragStart(e, stream.id)}
+                              onDragEnd={handleDragEnd}
+                              onDragOver={(e) => handleDragOver(e, stream.id)}
+                              onDrop={(e) => handleDrop(e, stream.id)}
+                              isDraggedOver={dragOverStreamId === stream.id}
+                              isDragging={draggedStreamId === stream.id}
+                              isNewlyCreated={newlyCreatedStreamId === stream.id}
+                              isSelected={selectedStream?.id === stream.id}
                             />
                           </div>
                         ))}
-                      </>
-                    )}
-                    
-                    {topicStreams.length === 0 && !loading && (
-                      <div className="col-span-full rounded-lg shadow-sm p-6 text-center bg-card border border-border">
-                        <p className="text-muted-foreground">
-                          No topic streams available to display in grid view.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ) : viewMode === 'list' && selectedStream ? (
-                  <TopicStreamWidget 
-                    stream={selectedStream} 
-                    onDelete={() => handleDeleteStream(selectedStream.id)} 
-                    onUpdate={handleUpdateStream}
-                    isGridView={false} 
-                  />
-                ) : viewMode === 'list' ? (
-                  <div className="rounded-lg shadow-sm p-6 text-center bg-card border border-border">
-                    <p className="text-muted-foreground">
-                      Select a topic stream or create a new one to get started
-                    </p>
-                  </div>
-                ) : null}
               </div>
             </div>
           )}
         </div>
-      </main>
+              )}
+            </>
+          )}
 
-      {/* Loading overlay for delete operation */}
-      {isDeleting && (
-        <div className="fixed inset-0 bg-background/75 flex items-center justify-center z-50" data-testid="deleting-overlay">
-          <div className="bg-card rounded-lg p-4 shadow-xl">
-            <p className="text-foreground">Deleting topic stream...</p>
-          </div>
-        </div>
-      )}
-
+          {/* Deep Dive Chat Modal */}
       {showDeepDive && selectedSummary && (
-        <div className="fixed inset-0 z-50 bg-background/75 flex items-center justify-center">
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col" style={{ maxWidth: '1400px' }}>
-            <div className="p-4 border-b border-border flex justify-between items-center">
-              {/* Truncated Stream Title */}
-              <div className="flex-1 overflow-hidden min-w-0 mr-4">
-                <h3 className="text-lg font-medium text-foreground truncate">
-                  Deep Dive: {selectedStream.query}
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowDeepDive(false)}
-                className="text-muted-foreground hover:text-foreground"
+            <div 
+              className="fixed bg-black/50 backdrop-blur-sm animate-in fade-in duration-300"
+              style={{ 
+                position: 'fixed',
+                top: '0',
+                left: '0',
+                width: '100vw',
+                height: '100vh',
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem'
+              }}
+              onClick={() => {
+                setShowDeepDive(false);
+                setSelectedSummary(null);
+              }}
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Main content area with two columns */}
-            <div className="flex overflow-hidden flex-row w-full">
-
-              {/* Original Summary Section - Left Column */}
-              <div className="p-4 border-r border-border overflow-y-auto flex-1">
-                <h4 className="text-md font-medium text-foreground mb-2">Original Summary</h4>
-                {/* Render summary with potential truncation and Read More - Keep as is for now */}
-                <div className={`prose prose-sm max-w-none dark:prose-invert ${!isSummaryExpanded ? 'line-clamp-10' : ''}`}>
-                    <MarkdownRenderer content={selectedSummary.content} />
-                </div>
-              </div>
-
-              {/* Deep Dive Chat Section - Right Column */}
-              <div className="p-4 border-l border-border overflow-y-auto flex-1">
+              <div 
+                className="bg-card rounded-xl shadow-xl animate-in slide-in-from-bottom-4 duration-300"
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  height: '80vh',
+                  maxWidth: '64rem',
+                  maxHeight: '90vh',
+                  margin: '0',
+                  overflow: 'hidden'
+                }}
+                onClick={e => e.stopPropagation()}
+              >
                  <DeepDiveChat 
-                    topicStreamId={selectedStream.id} 
-                    summaryId={selectedSummary.id}
-                    topic={selectedStream.query}
-                    onAppend={handleAppendSummary}
+                  summary={selectedSummary}
+                  onClose={() => {
+                    setShowDeepDive(false);
+                    setSelectedSummary(null);
+                  }}
                   />
-              </div>
-            </div>
           </div>
         </div>
       )}
+
+          {/* Keyboard Shortcuts Help Modal */}
+          {showKeyboardHelp && (
+            <KeyboardShortcutsHelp
+              isOpen={showKeyboardHelp}
+              onClose={() => setShowKeyboardHelp(false)}
+            />
+          )}
+        </main>
+      </div>
     </div>
   );
 };
